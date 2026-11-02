@@ -1,14 +1,6 @@
 from app.schemas import ChatResponse, Source
 
-# 假資料：RAG 接上之前，先用來串通前後端
-FAKE_ANSWER = (
-    "如果想找泥煤味不重的艾雷島威士忌，可以從這兩支開始：\n\n"
-    "- **Bunnahabhain 12**：使用幾乎不帶泥煤的麥芽，雪莉桶帶來果乾與堅果香氣 [1]。\n"
-    "- **Bruichladdich The Classic Laddie**：完全不使用泥煤，"
-    "風味以大麥本身的甜感和花香為主 [2]。\n\n"
-    "（這是開發用的假資料，尚未接上知識庫。）"
-)
-
+# 假資料：資料庫檢索接上之前，先當作檢索結果
 FAKE_SOURCES = [
     Source(
         id=1,
@@ -26,5 +18,17 @@ FAKE_SOURCES = [
 ]
 
 
+def build_prompt(question: str, sources: list[Source]) -> str:
+    raise NotImplementedError("由開發者實作：把問題和來源組成給 LLM 的 prompt")
+
+
+def generate(prompt: str) -> str:
+    # 暫時直接回傳 prompt：接上 LLM 之前，可以在前端畫面上檢查 build_prompt 組出來的內容
+    return prompt
+
+
 def answer_question(question: str) -> ChatResponse:
-    return ChatResponse(answer=FAKE_ANSWER, sources=FAKE_SOURCES)
+    sources = FAKE_SOURCES
+    prompt = build_prompt(question, sources)
+    answer = generate(prompt)
+    return ChatResponse(answer=answer, sources=sources)

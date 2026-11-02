@@ -45,11 +45,11 @@ Whiskey-Assistant/
 ├── backend/
 │   ├── app/              # FastAPI 應用程式
 │   ├── scripts/          # 資料匯入等一次性腳本
+│   ├── .env.example      # 設定範本；實際設定放 .env（不進 git）
 │   └── requirements.txt
 ├── frontend/             # Vue 3 專案
 ├── data/                 # 原始資料（待提供）
 ├── docker-compose.yml    # 開發用，只跑 PostgreSQL + pgvector
-├── .env.example
 ├── ruff.toml
 ├── CLAUDE.md
 └── SPEC.md
@@ -181,7 +181,7 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 - 錯誤訊息須說明原因與處理方式，例如：「無法連線到伺服器。請確認後端已啟動，再重新提問。」
 - 未引用來源時顯示：「這次回答沒有引用知識庫資料。」
 
-## 9. 設定（`.env`）
+## 9. 設定（`backend/.env`）
 
 | 變數 | 說明 |
 |---|---|
