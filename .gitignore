@@ -1,0 +1,13 @@
+# 金鑰與個人設定
+.env
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Python
+.venv/
+__pycache__/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
