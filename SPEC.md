@@ -14,7 +14,7 @@ Whiskey Assistant 是一個威士忌問答助手：使用者以自然語言提�
 ### 要做
 
 - 資料匯入流程：讀取原始資料 → 切塊 → embedding → 寫入資料庫
-- `POST /api/chat`：單輪問答，以 SSE 串流回傳答案和來源
+- `POST /api/chat`：單輪問答，以 JSON 一次回傳答案和來源
 - 前端聊天介面：具備專業質感的輸入互動視窗
 
 ### 不做（之後的規劃見第 12 節）
@@ -24,6 +24,7 @@ Whiskey Assistant 是一個威士忌問答助手：使用者以自然語言提�
 - 混合檢索、rerank、metadata 過濾
 - 正式部署
 - 測試（見 `CLAUDE.md`）
+- 串流輸出（SSE）：等 Claude 回答完整串接後再加回
 
 ## 3. 技術選型
 
@@ -95,7 +96,7 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 1. 用 `bge-m3` 產生問題的 embedding
 2. 用 cosine 距離從 `chunks` 取出最相近的前 k 筆（k 預設為 5，寫在設定檔）
 3. 把切塊加上編號 `[1]`、`[2]`… 組進 prompt，要求 Claude 根據這些資料回答，並以編號標註引用
-4. 以串流方式回傳 Claude 的回答，最後回傳來源清單
+4. 回傳 Claude 的回答與來源清單
 
 > **待定**：知識庫找不到相關資料時要怎麼回應，留到後續 polish 階段再決定。
 
@@ -111,21 +112,26 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 
 `question` 不可為空，長度上限 1000 字。
 
-**Response**：`text/event-stream`（SSE），依序送出以下事件：
+**Response**：`application/json`
 
-| 事件 | data | 說明 |
-|---|---|---|
-| `token` | `{"text": "..."}` | 回答的文字片段，會送出多次 |
-| `sources` | `[{"id": 1, "title": "...", "source": "...", "content": "..."}]` | 本次引用的來源，`id` 對應回答中的 `[n]` |
-| `done` | `{}` | 結束 |
-| `error` | `{"message": "..."}` | 發生錯誤，之後不再送出其他事件 |
+```json
+{
+  "answer": "可以從 Bunnahabhain 12 開始…… [1]",
+  "sources": [
+    { "id": 1, "title": "...", "source": "...", "content": "..." }
+  ]
+}
+```
+
+- `answer`：Markdown 格式的回答，以 `[n]` 標註引用
+- `sources`：本次引用的來源，`id` 對應回答中的 `[n]`；沒有引用時為空陣列
+- `question` 驗證失敗時回傳 422
 
 ## 8. 前端需求
 
 - 介面和回答都使用繁體中文
 - 視覺設計見下方「視覺設計」小節
-- 輸入框會隨內容自動長高；Enter 送出、Shift+Enter 換行
-- 回答以串流方式逐字顯示
+- 輸入框會隨內容自動長高；Enter 換行，只有點「提問」按鈕才會送出
 - 回答使用 Markdown 渲染
 - 回答下方顯示來源，點開可以看到原文片段
 - 載入中、錯誤都要有明確的狀態提示
@@ -141,13 +147,16 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 |---|---|---|
 | Limewash | `#E9EAE6` | 背景 |
 | Char | `#2B2420` | 主要文字 |
-| Oak | `#9C8268` | 分隔線、次要文字、輸入框底線 |
+| Oak | `#9C8268` | 只用於分隔線與輸入框底線；對背景僅 2.99:1，不可用於文字 |
 | Sherry | `#7A2E22` | 只用於桶號標記 |
-| Spirit | `#C8892E` | 只用於輸入游標與鍵盤 focus 外框 |
+| Spirit | `#C8892E` | 串流加回後用於輸入游標；對背景僅 2.46:1，不可用於 focus 外框 |
+| Spirit Deep | `#A8681A` | 鍵盤 focus 外框（3.73:1，符合非文字元素 3:1 的對比要求） |
+
+次要文字一律使用 Char。
 
 **字體**（Google Fonts）
 
-- LXGW WenKai TC：所有中文文字
+- LXGW WenKai TC：所有中文文字（少數字採舊字形，例如「為」顯示為「爲」，已確認接受）
 - Big Shoulders Stencil：只用於桶號標記與 Logo
 
 **版面**
@@ -155,15 +164,15 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 - 單欄、靠左對齊，每行最多約 34 個中文字
 - 不使用聊天泡泡；每組問答是一筆條目：問題為標題、回答為內文、來源為條目下方的紀錄列
 - 來源列顯示桶號與文件標題，點擊後就地展開原文片段
-- 輸入區固定在畫面底部，呈現為帳冊橫線
-- 空白狀態顯示三個可點擊的範例問題：
+- 輸入區呈現為帳冊橫線：空白狀態時位於畫面中央（標題與範例問題之間），開始對話後固定在畫面底部
+- 空白狀態顯示三個範例問題，點擊後填入輸入框（不直接送出），讓使用者可以先修改：
   - 泥煤味不重、帶果香的艾雷島威士忌有哪些？
   - Lagavulin 16 和 Laphroaig 10 差在哪？
   - 雪莉桶熟成會帶來什麼風味？
 
 **動態效果**
 
-- 只有一個：來源送達時，桶號標記依序以蓋章方式出現
+- 只有一個：回答出現時，桶號標記依序以蓋章方式出現
 - 不加入進場動畫與 hover 效果；系統設定減少動態效果時直接顯示
 
 **文案**
@@ -184,8 +193,8 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 ## 10. 開發順序
 
 1. 用 `docker-compose.yml` 跑起 PostgreSQL + pgvector，建立資料表
-2. 後端：用假資料串通 `/api/chat` 的 SSE 串流
-3. 前端：完成聊天介面，接上串流
+2. 後端：用假資料串通 `/api/chat`
+3. 前端：完成聊天介面，接上 `/api/chat`
 4. 拿到資料後：完成資料匯入腳本
 5. 把真正的檢索和 Claude 接進 `/api/chat`
 

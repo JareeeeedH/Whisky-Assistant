@@ -1,0 +1,57 @@
+:root {
+  --limewash: #e9eae6;
+  --char: #2b2420;
+  --oak: #9c8268;
+  --sherry: #7a2e22;
+  --spirit: #c8892e;
+  /* Spirit 對背景只有 2.46:1，focus 外框至少要 3:1，所以用同色系的深色版本 */
+  --spirit-deep: #a8681a;
+
+  --font-text: 'LXGW WenKai TC', 'Noto Serif TC', serif;
+  --font-stencil: 'Big Shoulders Stencil', 'Arial Narrow', sans-serif;
+
+  /* 中文一個字約 1em，34em 即每行約 34 個字 */
+  --measure: 34em;
+  --gutter: 16px;
+  --dock-height: 8rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--limewash);
+  color: var(--char);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 18px;
+  /* 楷體筆畫多、字面大，行距比西文內文再寬一些 */
+  line-height: 1.85;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--spirit-deep);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

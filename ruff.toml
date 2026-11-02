@@ -1,0 +1,6 @@
+target-version = "py312"
+line-length = 100
+
+[lint]
+# E/F: 基本錯誤；I: import 排序；UP: 新版語法；B: 常見 bug；ANN: 型別提示（CLAUDE.md 規定）
+select = ["E", "F", "I", "UP", "B", "ANN"]
