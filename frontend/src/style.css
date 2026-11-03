@@ -1,5 +1,7 @@
 :root {
   --limewash: #e9eae6;
+  /* 比背景亮一階，只用於輸入框，讓書寫區從頁面中浮出來 */
+  --paper: #f7f7f4;
   --char: #2b2420;
   --oak: #9c8268;
   --sherry: #7a2e22;

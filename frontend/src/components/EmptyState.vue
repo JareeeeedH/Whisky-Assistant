@@ -10,7 +10,7 @@ const examples = [
 
 <template>
   <section class="empty">
-    <h1 class="title">關於威士忌的問題，<wbr />都可以問。</h1>
+    <h1 class="title">想找哪款威士忌呢？</h1>
     <slot />
     <ul class="examples">
       <li v-for="example in examples" :key="example">
@@ -30,8 +30,6 @@ const examples = [
   font-size: clamp(2rem, 6vw, 2.75rem);
   font-weight: 700;
   line-height: 1.3;
-  /* 中文預設每個字之間都能斷行，keep-all 讓標題只在逗號後的 wbr 斷開，不會把詞拆開 */
-  word-break: keep-all;
 }
 
 .examples {

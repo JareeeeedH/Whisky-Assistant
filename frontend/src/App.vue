@@ -114,12 +114,12 @@ async function ask(question: string): Promise<void> {
   padding-bottom: var(--dock-height);
 }
 
-/* 扣掉頁首高度後垂直置中；底部多留一些空間，讓內容落在比幾何中心略高的視覺中心 */
+/* 扣掉頁首高度後垂直置中；底部留較多空間，把標題和輸入框推到畫面偏上的位置 */
 .main.is-empty {
   display: flex;
   flex-direction: column;
   justify-content: center;
   min-height: calc(100dvh - 4.5rem);
-  padding-bottom: 10vh;
+  padding-bottom: 24vh;
 }
 </style>

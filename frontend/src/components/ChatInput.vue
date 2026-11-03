@@ -64,34 +64,48 @@ defineExpose({ focusAtEnd })
 .composer.is-docked {
   position: fixed;
   inset: auto 0 0;
-  padding: 1rem 0 0.75rem;
+  padding: 1rem var(--gutter) 0.75rem;
   background: var(--limewash);
   border-top: 1px solid var(--oak);
 }
 
-/* 固定在底部時脫離了 App.vue 的 .page，要自己補上同寬同內距才會和內容欄對齊 */
+/* 固定在底部時脫離了 App.vue 的 .page（40rem 含左右 gutter），外框寬度要扣掉 gutter 才會和內容欄對齊 */
 .is-docked .inner {
-  max-width: 40rem;
+  max-width: calc(40rem - 2 * var(--gutter));
   margin-inline: auto;
-  padding-inline: var(--gutter);
 }
 
+/* 外框包住輸入區和按鈕，整塊像一張可以書寫的帳冊欄位 */
 .inner {
   display: flex;
   align-items: flex-end;
-  gap: 1rem;
+  gap: 0.75rem;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  border: 1.5px solid var(--char);
+  border-radius: 4px;
+  background: var(--paper);
+}
+
+/* 鍵盤焦點落在 textarea，但外框才是使用者看到的輸入框，所以焦點樣式畫在外框上 */
+.inner:focus-within {
+  border-color: var(--spirit-deep);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--spirit-deep) 25%, transparent);
 }
 
 textarea {
   flex: 1;
   max-height: 12rem;
-  padding: 0.35rem 0;
+  padding: 0.4rem 0;
   border: 0;
-  border-bottom: 1px solid var(--oak);
-  border-radius: 0;
   background: transparent;
+  font-size: 1.05rem;
   line-height: 1.6;
   resize: none;
+}
+
+/* 空白狀態的輸入框是頁面主角，預設高一點，看起來就是要你寫字的地方 */
+.composer:not(.is-docked) textarea {
+  min-height: 4.2rem;
 }
 
 textarea::placeholder {
@@ -101,15 +115,13 @@ textarea::placeholder {
 
 textarea:focus-visible {
   outline: none;
-  border-bottom-color: var(--spirit-deep);
-  box-shadow: 0 1px 0 var(--spirit-deep);
 }
 
 button {
   flex: none;
-  padding: 0.35rem 1.2rem;
+  padding: 0.5rem 1.3rem;
   border: 0;
-  border-radius: 2px;
+  border-radius: 3px;
   background: var(--char);
   color: var(--limewash);
   font-weight: 700;
