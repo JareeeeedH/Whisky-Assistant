@@ -7,7 +7,7 @@ Whiskey Assistant 是一個威士忌問答助手：使用者以自然語言提�
 技術重點：
 
 - **Python 後端**：FastAPI、PostgreSQL、API 設計
-- **RAG**：資料切塊、embedding、向量檢索、prompt 組裝，**核心流程自行實作，不依賴 LangChain 等框架**，以完整掌握每個環節的行為與取捨
+- **RAG**：資料切塊、embedding、向量檢索、prompt 組裝
 
 ## 2. MVP 範圍
 
@@ -17,14 +17,14 @@ Whiskey Assistant 是一個威士忌問答助手：使用者以自然語言提�
 - `POST /api/chat`：單輪問答，以 JSON 一次回傳答案和來源
 - 前端聊天介面：具備專業質感的輸入互動視窗
 
-### 不做（之後的規劃見第 12 節）
+### 不做（之後的規劃見第 11 節）
 
 - 多輪對話（追問）
 - 使用者登入
 - 混合檢索、rerank、metadata 過濾
 - 正式部署
 - 測試（見 `CLAUDE.md`）
-- 串流輸出（SSE）：等 Claude 回答完整串接後再加回
+- 串流輸出（SSE）：等 LLM 回答完整串接後再加回
 
 ## 3. 技術選型
 
@@ -33,7 +33,7 @@ Whiskey Assistant 是一個威士忌問答助手：使用者以自然語言提�
 | 後端框架 | FastAPI |
 | 資料庫 | PostgreSQL + pgvector（開發時用 Docker 執行） |
 | Embedding | 本機 `bge-m3`（1024 維，支援中英文） |
-| LLM | Claude API（模型 ID 寫在設定檔） |
+| LLM | OpenAI API（模型 ID 寫在設定檔） |
 | Python 套件管理 | pip + venv（`requirements.txt`） |
 | 程式碼檢查 | ruff（設定在 `ruff.toml`） |
 | 前端 | Vue 3 + Vite + TypeScript，UI 自己刻，不套元件庫 |
@@ -43,12 +43,17 @@ Whiskey Assistant 是一個威士忌問答助手：使用者以自然語言提�
 ```
 Whiskey-Assistant/
 ├── backend/
-│   ├── app/              # FastAPI 應用程式
-│   ├── scripts/          # 資料匯入等一次性腳本
+│   ├── app/
+│   │   ├── main.py       # FastAPI 進入點與路由
+│   │   ├── schemas.py    # API 的 request / response 格式
+│   │   ├── retrieval.py  # 問題 embedding 與向量檢索
+│   │   └── chat.py       # prompt 組裝、呼叫 LLM、串起問答流程
+│   ├── db/schema.sql     # 資料表定義，資料庫第一次啟動時自動執行
+│   ├── scripts/          # 資料清理與匯入腳本
 │   ├── .env.example      # 設定範本；實際設定放 .env（不進 git）
 │   └── requirements.txt
 ├── frontend/             # Vue 3 專案
-├── data/                 # 原始資料（待提供）
+├── data/                 # 原始資料與清理結果（不進 git）
 ├── docker-compose.yml    # 開發用，只跑 PostgreSQL + pgvector
 ├── ruff.toml
 ├── CLAUDE.md
@@ -57,8 +62,6 @@ Whiskey-Assistant/
 
 ## 5. 資料庫結構
 
-資料內容還沒確定，先用通用結構，不確定的欄位放進 JSONB。等資料到位後再決定要不要拆成正式欄位。
-
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -66,7 +69,7 @@ CREATE TABLE documents (
     id          BIGSERIAL PRIMARY KEY,
     title       TEXT NOT NULL,
     source      TEXT,                          -- 資料來源（網址或檔名）
-    metadata    JSONB NOT NULL DEFAULT '{}',   -- 產區、酒廠、年份等
+    metadata    JSONB NOT NULL DEFAULT '{}',   -- 原始資料 id、分數（points、sgp）
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -97,7 +100,7 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 
 分成兩支腳本，中間產生 `data/whisky_clean.json`：清理只要幾秒、embedding 要很久，拆開後調整清理規則時不必重跑 embedding，也能直接打開檔案檢查清理結果。
 
-**腳本 1：`backend/scripts/clean_data.py`**（已完成）
+**腳本 1：`backend/scripts/clean_data.py`**
 
 1. 讀取 `data/whiskyDataset.json`
 2. 清理文字（`NAME`、`NOTE`）：
@@ -126,7 +129,7 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 { "id": 29, "name": "La Mauny 5 ans d'âge (45%, OB, Martinique, agricole, +/-1990)", "reason": "非威士忌烈酒", "matched": "martinique", "note": "..." }
 ```
 
-**腳本 2：組 chunk、embedding、寫入資料庫**（尚未實作）
+**腳本 2：`backend/scripts/ingest.py`**（組 chunk、embedding、寫入資料庫）
 
 1. 讀取 `data/whisky_clean.json`
 2. 組 chunk：一筆資料一個 chunk，內容為 `name` + 空行 + `note`
@@ -146,9 +149,9 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 ### 問答（`/api/chat`）
 
 1. 用 `bge-m3` 產生問題的 embedding
-2. 用 cosine 距離從 `chunks` 取出最相近的前 k 筆（k 預設為 5，寫在設定檔）
-3. 把切塊加上編號 `[1]`、`[2]`… 組進 prompt，要求 Claude 根據這些資料回答，並以編號標註引用
-4. 回傳 Claude 的回答與來源清單
+2. 用 cosine 距離從 `chunks` 取出最相近的前 k 筆（k 預設為 3，寫在設定檔）
+3. 把切塊加上編號 `[1]`、`[2]`… 組進 prompt，要求 LLM 根據這些資料回答，並以編號標註引用
+4. 回傳 LLM 的回答與來源清單
 
 > **待定**：知識庫找不到相關資料時要怎麼回應，留到後續 polish 階段再決定。
 
@@ -176,7 +179,7 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 ```
 
 - `answer`：Markdown 格式的回答，以 `[n]` 標註引用
-- `sources`：本次引用的來源，`id` 對應回答中的 `[n]`；沒有引用時為空陣列
+- `sources`：檢索到的前 k 筆資料，依相似度排序，`id` 為排名（1 到 k），對應回答中的 `[n]`；不論回答是否引用都會回傳
 - `question` 驗證失敗時回傳 422
 
 ## 8. 前端需求
@@ -201,7 +204,6 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 | Char | `#2B2420` | 主要文字 |
 | Oak | `#9C8268` | 只用於分隔線與輸入框底線；對背景僅 2.99:1，不可用於文字 |
 | Sherry | `#7A2E22` | 只用於桶號標記 |
-| Spirit | `#C8892E` | 串流加回後用於輸入游標；對背景僅 2.46:1，不可用於 focus 外框 |
 | Spirit Deep | `#A8681A` | 鍵盤 focus 外框（3.73:1，符合非文字元素 3:1 的對比要求） |
 
 次要文字一律使用 Char。
@@ -231,31 +233,23 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 
 - 送出按鈕寫「提問」
 - 錯誤訊息須說明原因與處理方式，例如：「無法連線到伺服器。請確認後端已啟動，再重新提問。」
-- 未引用來源時顯示：「這次回答沒有引用知識庫資料。」
+- 沒有任何來源時（例如知識庫尚未匯入資料）顯示：「這次回答沒有引用知識庫資料。」
 
 ## 9. 設定（`backend/.env`）
 
 | 變數 | 說明 |
 |---|---|
 | `DATABASE_URL` | PostgreSQL 連線字串 |
-| `ANTHROPIC_API_KEY` | Claude API 金鑰 |
-| `CLAUDE_MODEL` | Claude 模型 ID |
-| `RETRIEVAL_TOP_K` | 檢索筆數，預設 5 |
+| `OPENAI_API_KEY` | OpenAI API 金鑰 |
+| `LLM_MODEL` | OpenAI 模型 ID，預設 `gpt-6-luna` |
+| `RETRIEVAL_TOP_K` | 檢索筆數，預設 3 |
 
-## 10. 開發順序
-
-1. 用 `docker-compose.yml` 跑起 PostgreSQL + pgvector，建立資料表
-2. 後端：用假資料串通 `/api/chat`
-3. 前端：完成聊天介面，接上 `/api/chat`
-4. 拿到資料後：完成資料匯入腳本
-5. 把真正的檢索和 Claude 接進 `/api/chat`
-
-## 11. 待決定事項
+## 10. 待決定事項
 
 - 查無相關資料時的回應方式
 - 部署方式
 
-## 12. 後續路線圖
+## 11. 後續路線圖
 
 > 以下是 MVP 之後的方向，**目前不做**。每個階段開始前，再把細節寫進這份規格書。
 

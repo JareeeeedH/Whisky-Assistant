@@ -7,22 +7,17 @@
 - 註解說明「為什麼」，不重述程式碼「做了什麼」
 - 註解使用繁體中文，識別字使用英文
 - 修改程式碼後執行 `ruff check`（設定見 `ruff.toml`）
-- 現階段不撰寫測試，規劃於第 4 階段補上（見 SPEC.md 第 12 節）
+- 現階段不撰寫測試，規劃於第 4 階段補上（見 SPEC.md 第 11 節）
 
 # 常用指令
 
-本機的 5432、5433、5173–5180、8000 已被其他專案占用，所以本專案改用下列 port。
-
 - 資料庫：`docker compose up -d`（PostgreSQL + pgvector，port 5434）
-- 後端：在 `backend/` 執行 `.venv/Scripts/uvicorn app.main:app --port 8010 --reload`
+- 後端：在 `backend/` 執行 `.venv/Scripts/uvicorn app.main:app --port 8010 --reload --env-file .env`
 - 前端：在 `frontend/` 執行 `npm run dev`（http://localhost:5290，`/api` 經 proxy 轉到 8010）
 - 檢查：後端 `.venv/Scripts/ruff check .`；前端 `npm run build`（含型別檢查）
 
 # 開發分工
 
-RAG 核心邏輯由開發者親自實作，以確保對每個環節都有完整掌握。
-
-- 開發者實作：切塊、embedding 呼叫、檢索 SQL、prompt 組裝、Claude API 呼叫
   - Claude 先說明設計思路與相關概念，再提供實作提示（函式簽名、關鍵 API、注意事項），不直接提供完整實作
   - 開發者完成後由 Claude 進行 code review，指出問題與改進方向，並說明理由
   - 僅在開發者明確要求時提供完整實作
@@ -32,7 +27,6 @@ RAG 核心邏輯由開發者親自實作，以確保對每個環節都有完整�
 # 工作流程
 
 - 以小步迭代進行，每完成一步即暫停，待開發者確認後再繼續
-- 首次引入新概念（如 embedding、cosine 距離、HNSW、SSE）時，先簡要說明原理與選用理由，再進行實作
 - 每次修改後說明：異動的檔案、各自的職責、手動驗證方式
 - 新增依賴套件前須先徵詢開發者，並說明必要性
 - 以 SPEC.md 為實作依據；設計需要變更時先提出，確認後同步更新 SPEC.md
