@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import type { Recommendation } from '../api/chat'
 import { whiskyImageUrl } from '../whiskyImage'
-import { splitWhiskyTitle } from '../whiskyTitle'
+import { briefDetails, splitWhiskyTitle } from '../whiskyTitle'
 
 defineProps<{ recommendations: Recommendation[] }>()
 
@@ -48,12 +48,23 @@ function caskNumber(index: number): string {
       <div class="body">
         <h3 class="name">{{ splitWhiskyTitle(item.title).name }}</h3>
         <p v-if="splitWhiskyTitle(item.title).details.length > 0" class="details">
-          {{ splitWhiskyTitle(item.title).details.join(' / ') }}
+          {{ briefDetails(splitWhiskyTitle(item.title).details) }}
         </p>
-        <ul v-if="item.keywords.length > 0" class="keywords" aria-label="風味關鍵字">
-          <li v-for="keyword in item.keywords" :key="keyword">{{ keyword }}</li>
-        </ul>
-        <p class="description">{{ item.description }}</p>
+        <p class="tagline">{{ item.tagline }}</p>
+        <dl class="notes">
+          <div>
+            <dt>香氣</dt>
+            <dd>{{ item.nose }}</dd>
+          </div>
+          <div>
+            <dt>口感</dt>
+            <dd>{{ item.palate }}</dd>
+          </div>
+          <div>
+            <dt>尾韻</dt>
+            <dd>{{ item.finish }}</dd>
+          </div>
+        </dl>
       </div>
     </li>
   </ol>
@@ -139,33 +150,45 @@ function caskNumber(index: number): string {
 }
 
 .details {
-  margin: 0.2rem 0 0;
+  margin: 0.15rem 0 0;
   font-size: 0.85rem;
   line-height: 1.5;
 }
 
-.keywords {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin: 0.7rem 0 0;
-  padding: 0;
-  list-style: none;
+/* 一句話印象是每筆的重點，用比內文大的字級讓眼睛先停在這裡 */
+.tagline {
+  margin: 0.8rem 0 0;
+  font-size: 1.1rem;
+  line-height: 1.6;
 }
 
-.keywords li {
-  padding: 0 0.5em;
-  border: 1px solid var(--char);
+.notes {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.9rem 0 0;
+}
+
+.notes div {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.75rem;
+  align-items: baseline;
+}
+
+/* 琥珀色只用在這三個標籤上，讓冷色的頁面帶一點酒色，又不搶桶號的風頭 */
+.notes dt {
+  padding: 0 0.45em;
   border-radius: 2px;
-  font-size: 0.85rem;
+  background: color-mix(in srgb, var(--spirit) 30%, var(--limewash));
+  font-size: 0.8rem;
+  font-weight: 700;
   line-height: 1.7;
 }
 
-.description {
-  margin: 0.8rem 0 0;
+.notes dd {
+  margin: 0;
   font-size: 0.95rem;
-  line-height: 1.8;
-  white-space: pre-line;
+  line-height: 1.7;
 }
 
 @media (max-width: 30rem) {

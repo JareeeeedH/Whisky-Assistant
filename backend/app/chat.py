@@ -13,18 +13,20 @@ LLM_MODEL = os.environ.get("LLM_MODEL", "gpt-6-luna")
 client = OpenAI(timeout=60)
 
 INSTRUCTIONS = """你是威士忌顧問。下方「資料」是幾支威士忌的品飲筆記（英文），
-請為每支酒寫一段中文介紹。
+請為每支酒寫一張中文推薦卡。
 
-要寫的內容：
-- 每筆資料各寫一段介紹，約 100 到 200 字，描述這支酒的香氣、口感與尾韻。
-- 每筆另外列出 3 個最能代表這支酒的風味關鍵字，每個 2 到 4 個中文字，例如「碘酒」「雪莉果乾」。
-- 資料編號填在 id 欄位，介紹內文不要寫出編號。
+每支酒要寫的內容：
+- tagline：一句話印象，15 到 30 字，抓住這支酒最鮮明的個性，像侍酒師的開場白。
+- nose：香氣，一句話，20 到 50 字。
+- palate：口感，一句話，20 到 50 字。
+- finish：尾韻，一句話，20 到 50 字。
+- 資料編號填在 id 欄位，各欄內文不要寫出編號，也不要重複酒名。
 
 規則：
 - 風味與評價只能來自該筆筆記，不要加入筆記以外的知識；
   可以用生動的中文改寫，但不要誇大或補上筆記沒寫的風味。
+- 筆記沒有寫到加水的變化時不要提加水；筆記有寫時，可以挑重點帶到。
 - 資料是品飲者的個人筆記，提到評價時要說明是筆記的看法，不要寫成客觀事實。
-- 介紹中提到酒名時保留原文，不要翻譯。
 - 使用繁體中文，以純文字書寫，不要使用 Markdown 符號。"""
 
 
@@ -40,8 +42,10 @@ def build_prompt(sources: list[Source]) -> str:
 # LLM 的輸出格式（Structured Outputs）：只回傳編號與介紹，酒名由後端用編號對回資料庫
 class Description(BaseModel):
     id: int
-    keywords: list[str]
-    description: str
+    tagline: str
+    nose: str
+    palate: str
+    finish: str
 
 
 class Descriptions(BaseModel):
@@ -74,8 +78,10 @@ def answer_question(question: str) -> ChatResponse:
             recommendations.append(
                 Recommendation(
                     title=source.title,
-                    keywords=item.keywords,
-                    description=item.description,
+                    tagline=item.tagline,
+                    nose=item.nose,
+                    palate=item.palate,
+                    finish=item.finish,
                     image=source.image,
                 )
             )

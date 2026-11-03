@@ -20,3 +20,13 @@ export function splitWhiskyTitle(title: string): WhiskyTitle {
   }
   return { name, details }
 }
+
+// 括號內前兩項固定是濃度與裝瓶商；桶號、瓶數等收藏家資訊對一般讀者沒有幫助，不顯示
+export function briefDetails(details: string[]): string {
+  const brief = []
+  for (const detail of details.slice(0, 2)) {
+    // OB 是 official bottling 的縮寫，一般讀者看不懂
+    brief.push(detail === 'OB' ? '原廠裝瓶' : detail)
+  }
+  return brief.join(' / ')
+}

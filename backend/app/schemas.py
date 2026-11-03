@@ -21,8 +21,10 @@ class Source(BaseModel):
 
 class Recommendation(BaseModel):
     title: str
-    keywords: list[str]
-    description: str
+    tagline: str
+    nose: str
+    palate: str
+    finish: str
     # 只給圖片檔名，網址由前端組：圖片放在哪裡是前端顯示的事
     image: str | None
 
