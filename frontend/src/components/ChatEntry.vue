@@ -10,7 +10,6 @@ defineProps<{ entry: Entry }>()
     <h2 class="question">{{ entry.question }}</h2>
 
     <p v-if="entry.status === 'loading'" class="waiting">正在挑選酒款…</p>
-    <p v-else-if="entry.summary" class="summary">{{ entry.summary }}</p>
 
     <p v-if="entry.error" class="error" role="alert">{{ entry.error }}</p>
 
@@ -37,12 +36,6 @@ defineProps<{ entry: Entry }>()
 
 .waiting {
   margin: 0;
-}
-
-.summary {
-  margin: 0;
-  max-width: var(--measure);
-  white-space: pre-line;
 }
 
 .error {

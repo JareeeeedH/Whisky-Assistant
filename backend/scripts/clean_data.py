@@ -139,6 +139,8 @@ def main() -> None:
                 "note": note,
                 "points": parse_points(score),
                 "sgp": parse_sgp(score),
+                # 只留檔名：圖片庫不沿用原始的 MaterialNN 資料夾，前端依檔名組出網址
+                "image": record["IMAGE_PATH"].split("/")[-1],
             }
         )
 

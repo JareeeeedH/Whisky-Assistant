@@ -1,10 +1,11 @@
 export type Recommendation = {
   title: string
   description: string
+  // 圖片檔名，網址由 whiskyImageUrl 組出
+  image: string | null
 }
 
 export type ChatResponse = {
-  summary: string
   recommendations: Recommendation[]
 }
 

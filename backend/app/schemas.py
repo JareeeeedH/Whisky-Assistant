@@ -16,13 +16,15 @@ class Source(BaseModel):
     title: str
     source: str | None
     content: str
+    image: str | None
 
 
 class Recommendation(BaseModel):
     title: str
     description: str
+    # 只給圖片檔名，網址由前端組：圖片放在哪裡是前端顯示的事
+    image: str | None
 
 
 class ChatResponse(BaseModel):
-    summary: str
     recommendations: list[Recommendation]

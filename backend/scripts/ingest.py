@@ -57,6 +57,7 @@ def write_to_db(records: list[dict], chunks: list[str], vectors: np.ndarray) -> 
                                 "original_id": record["id"],
                                 "points": record["points"],
                                 "sgp": record["sgp"],
+                                "image": record["image"],
                             }
                         ),
                     ),

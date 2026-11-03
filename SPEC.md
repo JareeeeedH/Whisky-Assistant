@@ -14,7 +14,7 @@ Whiskey Assistant 是一個威士忌推薦助手：使用者以自然語言描�
 ### 要做
 
 - 資料匯入流程：讀取原始資料 → 切塊 → embedding → 寫入資料庫
-- `POST /api/chat`：單輪問答，以 JSON 一次回傳總結與推薦酒款
+- `POST /api/chat`：單輪問答，以 JSON 一次回傳推薦酒款
 - 前端聊天介面：具備專業質感的輸入互動視窗
 
 ### 不做（之後的規劃見第 11 節）
@@ -69,7 +69,7 @@ CREATE TABLE documents (
     id          BIGSERIAL PRIMARY KEY,
     title       TEXT NOT NULL,
     source      TEXT,                          -- 資料來源（網址或檔名）
-    metadata    JSONB NOT NULL DEFAULT '{}',   -- 原始資料 id、分數（points、sgp）
+    metadata    JSONB NOT NULL DEFAULT '{}',   -- 原始資料 id、分數（points、sgp）、圖片檔名（image）
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -94,7 +94,7 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 - `NAME`：酒名，括號內含酒齡、年份、酒精濃度、裝瓶商、桶型等資訊
 - `NOTE`：品飲筆記，長度中位數約 976 字元，最長 3,002 字元
 - `SCORE`：例如 `SGP:551 - 89 points`，格式不一致，有一筆無法解析
-- `IMAGE_PATH`：圖片檔不在資料內，不使用
+- `IMAGE_PATH`：酒瓶照片的路徑，如 `Material29/Macallan-18-OB.jpg`。圖片檔不在資料內，另存於公開 repo `JareeeeedH/fundata`，見第 8 節「酒瓶照片」
 
 ### 資料匯入（離線執行的腳本）
 
@@ -117,10 +117,11 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 4. 解析 `SCORE`：
    - `points`：取緊貼 `points` 前的整數（多位評審如 `OH 92 DB 88 SV 91 points` 會取到 91）；解析不到則為 `null`（1 筆）
    - `sgp`：`SGP` 後的三位數字；不是三位數（如 `SGP:???`、`SGP: -`）則為 `null`（43 筆）
+   - `image`：取 `IMAGE_PATH` 的檔名，不保留 `MaterialNN` 資料夾
 5. 輸出 `data/whisky_clean.json`，共 14,555 筆，格式：
 
 ```json
-{ "id": 4, "name": "Ben Nevis 15 yo 1998/2014 (57.7%, ...)", "note": "...\nColour: white wine.\nNose: ...", "points": 89, "sgp": "551" }
+{ "id": 4, "name": "Ben Nevis 15 yo 1998/2014 (57.7%, ...)", "note": "...\nColour: white wine.\nNose: ...", "points": 89, "sgp": "551", "image": "Ben-Nevis-15-yo-1998-Acorn.jpg" }
 ```
 
 6. 被排除的 2,791 筆另存 `data/whisky_excluded.json`，供人工檢查篩選規則有沒有誤刪。`reason` 是排除原因，`matched` 是觸發排除的詞（同品牌推斷時為品牌名）：
@@ -150,9 +151,7 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 
 1. 用 `bge-m3` 產生問題的 embedding
 2. 用 cosine 距離從 `chunks` 取出最相近的前 k 筆（k 預設為 3，寫在設定檔）
-3. 把每筆資料加上編號，連同問題組進 prompt，一次呼叫 LLM，以 Structured Outputs 取得固定格式的 JSON：
-   - 總結：1 到 2 句，回應使用者的需求
-   - 每筆資料一段約 100 到 200 字的中文介紹：描述這支酒的風味，並說明它為什麼符合問題；可以寫得生動，但風味與評價都必須來自筆記
+3. 把每筆資料加上編號組進 prompt（問題只用於檢索，不送給 LLM），一次呼叫 LLM，以 Structured Outputs 取得固定格式的 JSON：每筆資料一段約 100 到 200 字的中文介紹，描述這支酒的香氣、口感與尾韻；可以寫得生動，但風味與評價都必須來自筆記
 4. 後端用編號把介紹對回檢索結果，酒名一律使用資料庫的 `title`，不採用 LLM 寫的酒名，避免被改寫或寫錯
 
 目前只針對「推薦酒款」類的問題設計，其他類型見第 10 節。
@@ -173,17 +172,16 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 
 ```json
 {
-  "summary": "想找泥煤味不重的艾雷島威士忌，可以從這幾支開始……",
   "recommendations": [
-    { "title": "Bunnahabhain 12 yo (46.3%, OB, 2022)", "description": "100 到 200 字的介紹……" }
+    { "title": "Bunnahabhain 12 yo (46.3%, OB, 2022)", "description": "100 到 200 字的介紹……", "image": "Bunnahabhain-12-OB.jpg" }
   ]
 }
 ```
 
-- `summary`：純文字的總結
 - `recommendations`：推薦酒款，依檢索的相似度排序
   - `title`：酒名，來自資料庫
   - `description`：純文字的中文介紹，由 LLM 撰寫
+  - `image`：酒瓶照片的檔名，網址由前端組出；沒有時為 `null`
 - `question` 驗證失敗時回傳 422
 
 ## 8. 前端需求
@@ -191,8 +189,12 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 - 介面和回答都使用繁體中文
 - 視覺設計見下方「視覺設計」小節
 - 輸入框會隨內容自動長高；Enter 換行，只有點「提問」按鈕才會送出
-- 回答先顯示總結，下方列出推薦酒款：酒名與介紹，不顯示評分與英文原文
-- 總結與介紹都以純文字顯示，不渲染 HTML
+- 回答列出推薦酒款：酒名、介紹與酒瓶照片，不顯示評分與英文原文
+- 酒瓶照片：由前端以 `image` 組出網址，瀏覽器直接向 GitHub 載入；載入失敗時不顯示
+  - 網址：`https://raw.githubusercontent.com/JareeeeedH/fundata/master/whiskyfun/{資料夾}/{檔名}`
+  - 資料夾是檔名中第一個英文字母的大寫（路徑區分大小寫），例如 `_balcones….jpg` 在 `B/`、`3-ships.jpg` 在 `S/`
+  - 已知限制：少數照片與酒款不符（原始資料的問題，例如 Okayama 那筆指向 Akashi 的照片）；照片著作權屬 WhiskyFun
+- 介紹以純文字顯示，不渲染 HTML
 - 載入中、錯誤都要有明確的狀態提示
 - 等待回答時不能重複送出
 
@@ -220,8 +222,8 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 **版面**
 
 - 單欄、靠左對齊，每行最多約 34 個中文字
-- 不使用聊天泡泡；每組問答是一筆條目：問題為標題、總結為內文、推薦酒款為條目下方的紀錄
-- 每筆推薦紀錄：左側桶號（01、02、03），右側酒名，酒名下方為介紹；紀錄之間以虛線分隔，不做成卡片外框
+- 不使用聊天泡泡；每組問答是一筆條目：問題為標題，下方是推薦酒款的紀錄
+- 每筆推薦紀錄：左側桶號（01、02、03），中間酒名與介紹，右側酒瓶小圖；紀錄之間以虛線分隔，不做成卡片外框
 - 輸入區呈現為帳冊橫線：空白狀態時位於畫面中央（標題與範例問題之間），開始對話後固定在畫面底部
 - 空白狀態顯示三個範例問題，點擊後填入輸入框（不直接送出），讓使用者可以先修改：
   - 泥煤味不重、帶果香的艾雷島威士忌有哪些？

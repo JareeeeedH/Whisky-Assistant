@@ -23,17 +23,19 @@ def retrieve(question: str, top_k: int) -> list[Source]:
         register_vector(conn)
         # ORDER BY 要直接用 <=> 由小到大排並搭配 LIMIT，HNSW 索引才會被使用
         rows = conn.execute(
-            "SELECT d.title, d.source, c.content "
+            "SELECT d.title, d.source, c.content, d.metadata->>'image' "
             "FROM chunks c JOIN documents d ON d.id = c.document_id "
             "ORDER BY c.embedding <=> %s "
             "LIMIT %s",
             (query, top_k),
         ).fetchall()
 
-    # id 用排名而非資料庫 id：它會成為回答裡的引用編號 [1]、[2]…
+    # id 用排名而非資料庫 id：prompt 裡的資料編號就是它，LLM 的介紹靠它對回酒款
     sources = []
-    for rank, (title, source, content) in enumerate(rows, start=1):
+    for rank, (title, source, content, image) in enumerate(rows, start=1):
         # chunk 開頭的酒名是為了讓 embedding 檢索得到；回傳時已有 title，去掉避免重複
         text = content.removeprefix(f"{title}\n\n")
-        sources.append(Source(id=rank, title=title, source=source, content=text))
+        sources.append(
+            Source(id=rank, title=title, source=source, content=text, image=image)
+        )
     return sources
