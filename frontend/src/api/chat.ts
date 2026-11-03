@@ -1,13 +1,11 @@
-export type Source = {
-  id: number
+export type Recommendation = {
   title: string
-  source: string | null
-  content: string
+  description: string
 }
 
 export type ChatResponse = {
-  answer: string
-  sources: Source[]
+  summary: string
+  recommendations: Recommendation[]
 }
 
 // 只代表「可以直接顯示給使用者看」的錯誤，其他例外照常往上拋

@@ -32,8 +32,8 @@ async function ask(question: string): Promise<void> {
   entries.value.push({
     id: nextId,
     question,
-    answer: '',
-    sources: null,
+    summary: '',
+    recommendations: null,
     status: 'loading',
     error: null,
   })
@@ -48,8 +48,8 @@ async function ask(question: string): Promise<void> {
     const result = await askQuestion(question)
     // 等待期間使用者若往上捲去看舊回答，就不要硬把畫面拉回底部
     const follow = isNearBottom()
-    entry.answer = result.answer
-    entry.sources = result.sources
+    entry.summary = result.summary
+    entry.recommendations = result.recommendations
     entry.status = 'done'
     if (follow) {
       await scrollToBottom()

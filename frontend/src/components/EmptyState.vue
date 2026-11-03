@@ -3,8 +3,8 @@ const emit = defineEmits<{ pick: [question: string] }>()
 
 const examples = [
   '泥煤味不重、帶果香的艾雷島威士忌有哪些？',
-  'Lagavulin 16 和 Laphroaig 10 差在哪？',
-  '雪莉桶熟成會帶來什麼風味？',
+  '推薦幾支雪莉桶風格、果乾味濃的威士忌',
+  '適合新手、口感溫和的日本威士忌',
 ]
 </script>
 

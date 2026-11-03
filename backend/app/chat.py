@@ -1,7 +1,7 @@
 import os
 
 from app.retrieval import retrieve
-from app.schemas import ChatResponse, Source
+from app.schemas import ChatResponse, Recommendation, Source
 
 RETRIEVAL_TOP_K = int(os.environ.get("RETRIEVAL_TOP_K", "3"))
 
@@ -35,4 +35,9 @@ def answer_question(question: str) -> ChatResponse:
     sources = retrieve(question, RETRIEVAL_TOP_K)
     prompt = build_prompt(question, sources)
     answer = generate(prompt)
-    return ChatResponse(answer=answer, sources=sources)
+    # 暫時的對應：LLM 接上之前，總結先放 generate 的輸出（目前就是 prompt），
+    # 介紹先放英文原文，讓前端可以先依新格式顯示
+    recommendations = []
+    for source in sources:
+        recommendations.append(Recommendation(title=source.title, description=source.content))
+    return ChatResponse(summary=answer, recommendations=recommendations)

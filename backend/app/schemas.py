@@ -10,6 +10,7 @@ class ChatRequest(BaseModel):
     question: Question
 
 
+# 檢索結果，只在後端內部使用；id 為排名，用來把 LLM 的介紹對回酒款
 class Source(BaseModel):
     id: int
     title: str
@@ -17,6 +18,11 @@ class Source(BaseModel):
     content: str
 
 
+class Recommendation(BaseModel):
+    title: str
+    description: str
+
+
 class ChatResponse(BaseModel):
-    answer: str
-    sources: list[Source]
+    summary: str
+    recommendations: list[Recommendation]
