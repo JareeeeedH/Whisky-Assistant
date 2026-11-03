@@ -2,10 +2,11 @@
 import { ref } from 'vue'
 import type { Recommendation } from '../api/chat'
 import { whiskyImageUrl } from '../whiskyImage'
+import { splitWhiskyTitle } from '../whiskyTitle'
 
 defineProps<{ recommendations: Recommendation[] }>()
 
-// 圖片庫有少數檔案缺漏，載入失敗就整個不顯示，不留破圖
+// 圖片庫有少數檔案缺漏，載入失敗就改顯示空白底，不留破圖
 const failedImages = ref(new Set<string>())
 
 function imageUrl(item: Recommendation): string | null {
@@ -30,22 +31,30 @@ function caskNumber(index: number): string {
 <template>
   <ol class="records">
     <li v-for="(item, index) in recommendations" :key="item.title" class="record">
-      <span class="cask-number" :style="{ '--order': index }" aria-hidden="true">
-        {{ caskNumber(index) }}
-      </span>
+      <div class="photo">
+        <!-- 酒名就在右側，照片只是輔助辨識，alt 留空避免螢幕閱讀器重複念酒名 -->
+        <img
+          v-if="imageUrl(item)"
+          :src="imageUrl(item) ?? undefined"
+          alt=""
+          loading="lazy"
+          @error="markFailed(item.image)"
+        />
+        <span class="cask-number" :style="{ '--order': index }" aria-hidden="true">
+          {{ caskNumber(index) }}
+        </span>
+      </div>
+
       <div class="body">
-        <h3 class="title">{{ item.title }}</h3>
+        <h3 class="name">{{ splitWhiskyTitle(item.title).name }}</h3>
+        <p v-if="splitWhiskyTitle(item.title).details.length > 0" class="details">
+          {{ splitWhiskyTitle(item.title).details.join(' / ') }}
+        </p>
+        <ul v-if="item.keywords.length > 0" class="keywords" aria-label="風味關鍵字">
+          <li v-for="keyword in item.keywords" :key="keyword">{{ keyword }}</li>
+        </ul>
         <p class="description">{{ item.description }}</p>
       </div>
-      <!-- 酒名已在左側，照片只是輔助辨識，所以 alt 留空避免螢幕閱讀器重複念酒名 -->
-      <img
-        v-if="imageUrl(item)"
-        class="bottle"
-        :src="imageUrl(item) ?? undefined"
-        alt=""
-        loading="lazy"
-        @error="markFailed(item.image)"
-      />
     </li>
   </ol>
 </template>
@@ -61,10 +70,10 @@ function caskNumber(index: number): string {
 
 .record {
   display: grid;
-  grid-template-columns: 3.25rem 1fr 4.5rem;
-  column-gap: 1rem;
+  grid-template-columns: 6.5rem 1fr;
+  column-gap: 1.25rem;
   align-items: start;
-  padding: 1.1rem 0 1.2rem;
+  padding: 1.5rem 0;
   border-bottom: 1px dashed var(--oak);
 }
 
@@ -74,15 +83,34 @@ function caskNumber(index: number): string {
   padding-bottom: 0;
 }
 
-/* 桶號是整個介面唯一的大膽元素：回答出現時依序蓋章 */
+/* 原圖自帶黃色外框：放大後讓外框落在容器外被裁掉 */
+.photo {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--oak) 18%, var(--limewash));
+}
+
+/* inset 的上下百分比依高度、左右依寬度計算，四邊才會裁掉相同比例 */
+.photo img {
+  position: absolute;
+  inset: -10%;
+  width: 120%;
+  height: 120%;
+  object-fit: cover;
+}
+
+/* 桶號是整個介面唯一的大膽元素：蓋在照片角落，回答出現時依序蓋章 */
 .cask-number {
-  justify-self: start;
-  margin-top: 0.1rem;
+  position: absolute;
+  top: 0.4rem;
+  left: 0.4rem;
   padding: 0 0.3em;
   border: 2px solid currentColor;
   border-radius: 2px;
+  background: var(--limewash);
   font-family: var(--font-stencil);
-  font-size: 1.35rem;
+  font-size: 1.2rem;
   font-weight: 800;
   line-height: 1.25;
   letter-spacing: 0.04em;
@@ -103,29 +131,51 @@ function caskNumber(index: number): string {
   }
 }
 
-.title {
-  margin: 0 0 0.35rem;
-  font-size: 1rem;
+.name {
+  margin: 0;
+  font-size: 1.3rem;
   font-weight: 700;
+  line-height: 1.35;
+}
+
+.details {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
   line-height: 1.5;
 }
 
-.description {
-  margin: 0;
-  white-space: pre-line;
+.keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  list-style: none;
 }
 
-/* 原圖是約 150px 寬的縮圖，顯示得比原尺寸小才不會模糊 */
-.bottle {
-  width: 100%;
-  height: auto;
-  margin-top: 0.3rem;
+.keywords li {
+  padding: 0 0.5em;
+  border: 1px solid var(--char);
+  border-radius: 2px;
+  font-size: 0.85rem;
+  line-height: 1.7;
+}
+
+.description {
+  margin: 0.8rem 0 0;
+  font-size: 0.95rem;
+  line-height: 1.8;
+  white-space: pre-line;
 }
 
 @media (max-width: 30rem) {
   .record {
-    grid-template-columns: 2.75rem 1fr 3.5rem;
-    column-gap: 0.75rem;
+    grid-template-columns: 4.5rem 1fr;
+    column-gap: 0.9rem;
+  }
+
+  .cask-number {
+    font-size: 1rem;
   }
 }
 </style>

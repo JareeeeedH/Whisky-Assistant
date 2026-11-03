@@ -151,7 +151,7 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 
 1. 用 `bge-m3` 產生問題的 embedding
 2. 用 cosine 距離從 `chunks` 取出最相近的前 k 筆（k 預設為 3，寫在設定檔）
-3. 把每筆資料加上編號組進 prompt（問題只用於檢索，不送給 LLM），一次呼叫 LLM，以 Structured Outputs 取得固定格式的 JSON：每筆資料一段約 100 到 200 字的中文介紹，描述這支酒的香氣、口感與尾韻；可以寫得生動，但風味與評價都必須來自筆記
+3. 把每筆資料加上編號組進 prompt（問題只用於檢索，不送給 LLM），一次呼叫 LLM，以 Structured Outputs 取得固定格式的 JSON：每筆資料 3 個風味關鍵字（每個 2 到 4 字），加上一段約 100 到 200 字的中文介紹，描述這支酒的香氣、口感與尾韻；可以寫得生動，但風味與評價都必須來自筆記
 4. 後端用編號把介紹對回檢索結果，酒名一律使用資料庫的 `title`，不採用 LLM 寫的酒名，避免被改寫或寫錯
 
 目前只針對「推薦酒款」類的問題設計，其他類型見第 10 節。
@@ -173,13 +173,14 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 ```json
 {
   "recommendations": [
-    { "title": "Bunnahabhain 12 yo (46.3%, OB, 2022)", "description": "100 到 200 字的介紹……", "image": "Bunnahabhain-12-OB.jpg" }
+    { "title": "Bunnahabhain 12 yo (46.3%, OB, 2022)", "keywords": ["雪莉果乾", "堅果", "海鹽"], "description": "100 到 200 字的介紹……", "image": "Bunnahabhain-12-OB.jpg" }
   ]
 }
 ```
 
 - `recommendations`：推薦酒款，依檢索的相似度排序
   - `title`：酒名，來自資料庫
+  - `keywords`：3 個風味關鍵字，由 LLM 撰寫
   - `description`：純文字的中文介紹，由 LLM 撰寫
   - `image`：酒瓶照片的檔名，網址由前端組出；沒有時為 `null`
 - `question` 驗證失敗時回傳 422
@@ -189,8 +190,9 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 - 介面和回答都使用繁體中文
 - 視覺設計見下方「視覺設計」小節
 - 輸入框會隨內容自動長高；Enter 換行，只有點「提問」按鈕才會送出
-- 回答列出推薦酒款：酒名、介紹與酒瓶照片，不顯示評分與英文原文
-- 酒瓶照片：由前端以 `image` 組出網址，瀏覽器直接向 GitHub 載入；載入失敗時不顯示
+- 回答列出推薦酒款：酒瓶照片、酒名、風味關鍵字與介紹，不顯示評分與英文原文
+- 酒名：由前端以第一個 `(` 切開，括號前為主標題，括號內的濃度、裝瓶商、桶型等以 ` / ` 連接成較小的第二行
+- 酒瓶照片：由前端以 `image` 組出網址，瀏覽器直接向 GitHub 載入；原圖自帶黃色外框，顯示時裁掉四邊；載入失敗時只留空白底與桶號
   - 網址：`https://raw.githubusercontent.com/JareeeeedH/fundata/master/whiskyfun/{資料夾}/{檔名}`
   - 資料夾是檔名中第一個英文字母的大寫（路徑區分大小寫），例如 `_balcones….jpg` 在 `B/`、`3-ships.jpg` 在 `S/`
   - 已知限制：少數照片與酒款不符（原始資料的問題，例如 Okayama 那筆指向 Akashi 的照片）；照片著作權屬 WhiskyFun
@@ -223,7 +225,7 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 
 - 單欄、靠左對齊，每行最多約 34 個中文字
 - 不使用聊天泡泡；每組問答是一筆條目：問題為標題，下方是推薦酒款的紀錄
-- 每筆推薦紀錄：左側桶號（01、02、03），中間酒名與介紹，右側酒瓶小圖；紀錄之間以虛線分隔，不做成卡片外框
+- 每筆推薦紀錄：左側為酒瓶照片（3:4），桶號（01、02、03）蓋在照片左上角；右側依序為酒名、裝瓶細節、風味關鍵字、介紹；紀錄之間以虛線分隔，不做成卡片外框
 - 輸入區呈現為帳冊橫線：空白狀態時位於畫面中央（標題與範例問題之間），開始對話後固定在畫面底部
 - 空白狀態顯示三個範例問題，點擊後填入輸入框（不直接送出），讓使用者可以先修改：
   - 泥煤味不重、帶果香的艾雷島威士忌有哪些？

@@ -17,6 +17,7 @@ INSTRUCTIONS = """你是威士忌顧問。下方「資料」是幾支威士忌�
 
 要寫的內容：
 - 每筆資料各寫一段介紹，約 100 到 200 字，描述這支酒的香氣、口感與尾韻。
+- 每筆另外列出 3 個最能代表這支酒的風味關鍵字，每個 2 到 4 個中文字，例如「碘酒」「雪莉果乾」。
 - 資料編號填在 id 欄位，介紹內文不要寫出編號。
 
 規則：
@@ -39,6 +40,7 @@ def build_prompt(sources: list[Source]) -> str:
 # LLM 的輸出格式（Structured Outputs）：只回傳編號與介紹，酒名由後端用編號對回資料庫
 class Description(BaseModel):
     id: int
+    keywords: list[str]
     description: str
 
 
@@ -63,15 +65,17 @@ def answer_question(question: str) -> ChatResponse:
     prompt = build_prompt(sources)
     descriptions = generate(prompt)
 
-    description_by_id = {item.id: item.description for item in descriptions}
+    description_by_id = {item.id: item for item in descriptions}
     # 依檢索排名輸出；LLM 漏寫或寫錯編號的酒款就略過，不顯示沒有介紹的紀錄
     recommendations = []
     for source in sources:
         if source.id in description_by_id:
+            item = description_by_id[source.id]
             recommendations.append(
                 Recommendation(
                     title=source.title,
-                    description=description_by_id[source.id],
+                    keywords=item.keywords,
+                    description=item.description,
                     image=source.image,
                 )
             )

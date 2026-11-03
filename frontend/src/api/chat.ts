@@ -1,5 +1,6 @@
 export type Recommendation = {
   title: string
+  keywords: string[]
   description: string
   // 圖片檔名，網址由 whiskyImageUrl 組出
   image: string | null
