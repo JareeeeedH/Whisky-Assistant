@@ -84,12 +84,64 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 
 ## 6. RAG 流程
 
+### 原始資料
+
+`data/whiskyDataset.json`（不進 git）：17,346 筆英文品飲筆記，每筆有 `id`、`NAME`、`NOTE`、`SCORE`、`IMAGE_PATH`。
+
+- `NAME`：酒名，括號內含酒齡、年份、酒精濃度、裝瓶商、桶型等資訊
+- `NOTE`：品飲筆記，長度中位數約 976 字元，最長 3,002 字元
+- `SCORE`：例如 `SGP:551 - 89 points`，格式不一致，有一筆無法解析
+- `IMAGE_PATH`：圖片檔不在資料內，不使用
+
 ### 資料匯入（離線執行的腳本）
 
-1. 讀取 `data/` 裡的原始資料
-2. 切塊：切法和大小**等資料到位後再決定**
-3. 用 `bge-m3` 產生每個切塊的 embedding
+分成兩支腳本，中間產生 `data/whisky_clean.json`：清理只要幾秒、embedding 要很久，拆開後調整清理規則時不必重跑 embedding，也能直接打開檔案檢查清理結果。
+
+**腳本 1：`backend/scripts/clean_data.py`**（已完成）
+
+1. 讀取 `data/whiskyDataset.json`
+2. 清理文字（`NAME`、`NOTE`）：
+   - 用 `html.unescape` 還原 HTML 跳脫字元（411 個酒名、1,898 篇筆記，最多的是 `&mdash;`、`&egrave;`、`&euro;`）
+   - 把連續空白、換行、tab 合併成一個空格，並去除前後空白（16,314 篇筆記、6,861 個酒名有前後空白；1,256 篇有連續空白）
+   - 在筆記的段落標籤（`Colour`、`Nose`、`With water`、`Mouth`、`Finish`、`Comments` 等）前換行。99.3% 的筆記依 Colour → Nose → Mouth → Finish → Comments 的順序書寫，換行後 LLM 與前端都能看出段落。開頭的引言保留，常含裝瓶背景、價格、是否有泥煤等資訊
+3. 排除資料：
+   - 酒名不含括號的 16 筆：這些「酒名」其實是一句話（如 `Let's try another one...`），無法辨識是哪支酒。另有 2 筆威士忌因酒名少了左括號一併被排除，先接受
+   - 非威士忌烈酒，符合任一條件即排除：
+     - 酒名括號內以逗號分隔的項目中，有任一項（去掉開頭的 `la `）整項等於烈酒類別（`cognac`、`bas-armagnac`、`grande champagne`、`borderies`、`agricole`、`tequila`、`mezcal`、`cachaça` 等）或蘭姆酒、龍舌蘭產地（`jamaica`、`guyana`、`barbados`、`martinique` 等）；或含有 `rhum` 但不含 `whisky`（法國獨立裝瓶商 `Whisky & Rhum` 旗下是威士忌）。只比對整項，`rum cask finish` 這類過桶描述不會誤刪
+     - 品牌名（酒名開頭到第一個數字、引號或括號之前）本身是上述類別或產地（如 `Jamaica 1990`），或含有 `rum`、`rhum`（如 `Jamaican Rum`）
+     - 同品牌有 10% 以上被判定為非威士忌：許多蘭姆酒的酒名只寫酒廠名（如 `Hampden 8 yo (56.5%, Kintra)`）。實測非威士忌品牌至少 14%，威士忌酒廠因特例被誤判的最多約 6%
+   - 波本、裸麥、調和、穀物威士忌都保留。目前已知 Kavalan 有 1 筆以 `rum` 標示桶型而被誤刪；仍有少數漏網的非威士忌（例如酒名寫成 `Frapin … Grande Champagne …` 而不在括號內），先接受
+4. 解析 `SCORE`：
+   - `points`：取緊貼 `points` 前的整數（多位評審如 `OH 92 DB 88 SV 91 points` 會取到 91）；解析不到則為 `null`（1 筆）
+   - `sgp`：`SGP` 後的三位數字；不是三位數（如 `SGP:???`、`SGP: -`）則為 `null`（43 筆）
+5. 輸出 `data/whisky_clean.json`，共 14,555 筆，格式：
+
+```json
+{ "id": 4, "name": "Ben Nevis 15 yo 1998/2014 (57.7%, ...)", "note": "...\nColour: white wine.\nNose: ...", "points": 89, "sgp": "551" }
+```
+
+6. 被排除的 2,791 筆另存 `data/whisky_excluded.json`，供人工檢查篩選規則有沒有誤刪。`reason` 是排除原因，`matched` 是觸發排除的詞（同品牌推斷時為品牌名）：
+
+```json
+{ "id": 29, "name": "La Mauny 5 ans d'âge (45%, OB, Martinique, agricole, +/-1990)", "reason": "非威士忌烈酒", "matched": "martinique", "note": "..." }
+```
+
+**腳本 2：組 chunk、embedding、寫入資料庫**（尚未實作）
+
+1. 讀取 `data/whisky_clean.json`
+2. 組 chunk：一筆資料一個 chunk，內容為 `name` + 空行 + `note`
+   - 不再切細：最長約 3,100 字元（約 770 token），遠低於 `bge-m3` 的 8,192 token 上限；切開會讓口感段落和酒名分離
+   - 一定要包含 `name`：許多筆記內文不提酒名，少了它檢索不到，LLM 也不知道在講哪支酒
+   - 不放分數：數字對語意檢索幫助不大，`points`、`sgp` 存進 `documents.metadata` 供之後篩選、排序
+3. 用 `bge-m3` 產生每個 chunk 的 embedding
 4. 寫入 `documents` 和 `chunks`
+
+已知但先不處理的資料問題（第 2 階段用評估集確認影響後再決定）：
+
+- 約 800 篇筆記依賴上下文，例如 `Nose: same as above`、`same cask`；單獨被檢索到時資訊不足
+- 86 篇筆記結尾被截斷；約 690 篇開頭不完整（沒有 `Colour`/`Nose` 段落）
+- 275 組同名酒款有多篇不同筆記（同一支酒品飲多次），全部保留
+- 4 篇筆記內含多支酒的品飲紀錄
 
 ### 問答（`/api/chat`）
 
@@ -133,7 +185,7 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 - 視覺設計見下方「視覺設計」小節
 - 輸入框會隨內容自動長高；Enter 換行，只有點「提問」按鈕才會送出
 - 回答使用 Markdown 渲染
-- 回答下方顯示來源，點開可以看到原文片段
+- 回答下方顯示來源，點開可以看到原文片段；原文保留換行（`white-space: pre-line`），段落才看得出來
 - 載入中、錯誤都要有明確的狀態提示
 - 等待回答時不能重複送出
 
@@ -200,8 +252,6 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 
 ## 11. 待決定事項
 
-- 資料來源（由使用者提供）
-- 切塊策略
 - 查無相關資料時的回應方式
 - 部署方式
 

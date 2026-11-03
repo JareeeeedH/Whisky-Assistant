@@ -11,3 +11,6 @@ __pycache__/
 # Node
 node_modules/
 dist/
+
+# 原始資料：檔案大，且授權尚未確認，不放進 repo
+data/
