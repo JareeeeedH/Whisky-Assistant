@@ -33,6 +33,7 @@ async function ask(question: string): Promise<void> {
     id: nextId,
     question,
     recommendations: null,
+    notice: null,
     status: 'loading',
     error: null,
   })
@@ -48,6 +49,7 @@ async function ask(question: string): Promise<void> {
     // 等待期間使用者若往上捲去看舊回答，就不要硬把畫面拉回底部
     const follow = isNearBottom()
     entry.recommendations = result.recommendations
+    entry.notice = result.notice
     entry.status = 'done'
     if (follow) {
       await scrollToBottom()

@@ -5,6 +5,7 @@ export type Entry = {
   question: string
   // null 代表還沒拿到回答
   recommendations: Recommendation[] | null
+  notice: string | null
   status: 'loading' | 'done' | 'error'
   error: string | null
 }

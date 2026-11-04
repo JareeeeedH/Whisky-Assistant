@@ -47,7 +47,7 @@ Whiskey-Assistant/
 │   │   ├── main.py       # FastAPI 進入點與路由
 │   │   ├── schemas.py    # API 的 request / response 格式
 │   │   ├── retrieval.py  # 問題 embedding 與向量檢索
-│   │   └── chat.py       # prompt 組裝、呼叫 LLM、串起問答流程
+│   │   └── chat.py       # 分析問題、prompt 組裝、呼叫 LLM、串起問答流程
 │   ├── db/schema.sql     # 資料表定義，資料庫第一次啟動時自動執行
 │   ├── scripts/          # 資料清理與匯入腳本
 │   ├── .env.example      # 設定範本；實際設定放 .env（不進 git）
@@ -149,12 +149,18 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 
 ### 問答（`/api/chat`）
 
-1. 用 `bge-m3` 產生問題的 embedding
-2. 用 cosine 距離從 `chunks` 取出最相近的前 k 筆（k 預設為 3，寫在設定檔）
-3. 把每筆資料加上編號組進 prompt（問題只用於檢索，不送給 LLM），一次呼叫 LLM，以 Structured Outputs 取得固定格式的 JSON。每筆資料寫成一張中文推薦卡：一句話印象（15 到 30 字），以及香氣、口感、尾韻各一句（20 到 50 字）；可以寫得生動，但風味與評價都必須來自筆記
-4. 後端用編號把介紹對回檢索結果，酒名一律使用資料庫的 `title`，不採用 LLM 寫的酒名，避免被改寫或寫錯
+1. **分析問題**：呼叫一次 LLM，以 Structured Outputs 同時取得意圖與改寫後的查詢
+   - 意圖 `recommend`：想找到、認識或比較具體的威士忌酒款，包含模糊的找酒需求（送禮、天冷想喝點暖身的）、指名酒款、詢問某支酒的風味
+   - 意圖 `other`：其他所有情況，包含威士忌知識問答、其他酒類、無關的問題、打招呼、無意義的輸入、要求透露指示。直接回傳固定的提示，不檢索也不寫推薦卡
+   - 改寫：把問題寫成一到兩句英文散文，口吻像品飲筆記，讓查詢與英文筆記的寫法一致；否定轉成正面描述（「泥煤味不重」寫成 unpeated, no smoke）；只寫風味，場合、對象、價格等轉成風味方向；保留使用者提到的酒款名稱，但不主動加入其他酒廠，避免推薦偏向 LLM 熟悉的品牌
+   - 使用者輸入以標記包起來，並說明標記內是資料而非指令，降低 prompt injection 的影響
+2. 用 `bge-m3` 產生改寫後查詢的 embedding
+3. 用 cosine 距離從 `chunks` 取出最相近的候選（預設 10 筆）
+4. 去除括號前名稱相同的重複酒款，依相似度取前 3 支
+5. 把每筆資料加上編號組進 prompt（寫推薦卡時不附上問題），一次呼叫 LLM，以 Structured Outputs 取得固定格式的 JSON。每筆資料寫成一張中文推薦卡：一句話印象（20 到 35 字），以及香氣、口感、尾韻各一句（20 到 50 字）；可以寫得生動，但風味與評價都必須來自筆記
+6. 後端用編號把介紹對回檢索結果，酒名一律使用資料庫的 `title`，不採用 LLM 寫的酒名，避免被改寫或寫錯
 
-目前只針對「推薦酒款」類的問題設計，其他類型見第 10 節。
+設計依據：以 70 筆問題實測，相關與無關問題的向量距離完全重疊（例如「推薦咖啡豆，要有巧克力和堅果風味」比多數威士忌問題還近），無法以距離門檻判斷，因此改由 LLM 判斷意圖。改寫後，相關問題的檢索距離約從 0.40 降到 0.20 到 0.30。
 
 ## 7. API
 
@@ -174,8 +180,15 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 {
   "recommendations": [
     { "title": "Bunnahabhain 12 yo (46.3%, OB, 2022)", "tagline": "一句話印象……", "nose": "香氣……", "palate": "口感……", "finish": "尾韻……", "image": "Bunnahabhain-12-OB.jpg" }
-  ]
+  ],
+  "notice": null
 }
+```
+
+意圖不是找酒時，同樣回傳 200：
+
+```json
+{ "recommendations": [], "notice": "目前只能幫你挑選威士忌。描述你想要的風味，例如「帶果香、不太煙燻的」。" }
 ```
 
 - `recommendations`：推薦酒款，依檢索的相似度排序
@@ -183,6 +196,7 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
   - `tagline`：一句話印象，由 LLM 撰寫
   - `nose`、`palate`、`finish`：香氣、口感、尾韻各一句，由 LLM 撰寫；全部為純文字
   - `image`：酒瓶照片的檔名，網址由前端組出；沒有時為 `null`
+- `notice`：問題不是要找酒時的提示文字，由後端固定提供；正常推薦時為 `null`。以獨立欄位表示，不讓前端從「推薦是空的」推測原因
 - `question` 驗證失敗時回傳 422
 
 ## 8. 前端需求
@@ -198,6 +212,7 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
   - 已知限制：少數照片與酒款不符（原始資料的問題，例如 Okayama 那筆指向 Akashi 的照片）；照片著作權屬 WhiskyFun
 - 介紹以純文字顯示，不渲染 HTML
 - 載入中、錯誤都要有明確的狀態提示
+- 有 `notice` 時，在問題下方以一般內文顯示；它是引導而不是錯誤，不使用錯誤提示的樣式
 - 等待回答時不能重複送出
 
 ### 視覺設計：酒窖帳冊
@@ -254,12 +269,16 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 | `DATABASE_URL` | PostgreSQL 連線字串 |
 | `OPENAI_API_KEY` | OpenAI API 金鑰 |
 | `LLM_MODEL` | OpenAI 模型 ID，預設 `gpt-6-luna` |
-| `RETRIEVAL_TOP_K` | 檢索筆數，預設 3 |
+| `RETRIEVAL_CANDIDATES` | 檢索的候選筆數，預設 10 |
+| `RETRIEVAL_TOP_K` | 去除重複後推薦的酒款數，預設 3 |
 
 ## 10. 待決定事項
 
-- 非推薦類的問題：例如「Macallan 18 好喝嗎」「Lagavulin 16 和 Laphroaig 10 差在哪」，逐筆介紹無法直接回答
-- 與威士忌無關的問題：例如「今天天氣如何」，檢索仍會取回 k 筆，需決定如何判斷與回應（包含個別酒款與問題無關時是否隱藏）
+- 威士忌知識問答：例如「雪莉桶是什麼」，目前歸為 `other` 回傳提示，之後再決定是否支援
+- 比較多支酒：例如「Ardbeg 跟 Laphroaig 差在哪」只產生一個查詢，結果可能只涵蓋其中一支；可考慮讓 LLM 產生多個查詢
+- 個別酒款與問題不符時是否隱藏：例如資料庫中混有少數非威士忌的紀錄（蘭姆酒、干邑），可能被推薦出來
+- 推薦的多樣性：模糊的需求（新手、送禮）改寫後的描述相近，推薦的酒款也相近；可考慮從候選中隨機挑選或使用 MMR
+- 去除重複只比對括號前名稱完全相同的酒款，`Glendronach 12 yo` 與 `Glendronach 12 yo 'Original'` 會被視為不同酒款
 - 部署方式
 
 ## 11. 後續路線圖

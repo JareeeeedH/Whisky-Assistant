@@ -31,3 +31,5 @@ class Recommendation(BaseModel):
 
 class ChatResponse(BaseModel):
     recommendations: list[Recommendation]
+    # 問題不是要找酒時的提示；用獨立欄位，前端才不必從「推薦是空的」猜原因
+    notice: str | None = None

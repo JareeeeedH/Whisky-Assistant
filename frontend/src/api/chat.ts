@@ -10,6 +10,8 @@ export type Recommendation = {
 
 export type ChatResponse = {
   recommendations: Recommendation[]
+  // 問題不是要找酒時，後端給的引導文字
+  notice: string | null
 }
 
 // 只代表「可以直接顯示給使用者看」的錯誤，其他例外照常往上拋

@@ -13,6 +13,9 @@ defineProps<{ entry: Entry }>()
 
     <p v-if="entry.error" class="error" role="alert">{{ entry.error }}</p>
 
+    <!-- 提示是在引導怎麼問，不是系統出錯，所以用一般內文而不是錯誤樣式 -->
+    <p v-if="entry.notice" class="notice">{{ entry.notice }}</p>
+
     <RecommendationList
       v-if="entry.recommendations && entry.recommendations.length > 0"
       :recommendations="entry.recommendations"
@@ -36,6 +39,11 @@ defineProps<{ entry: Entry }>()
 
 .waiting {
   margin: 0;
+}
+
+.notice {
+  margin: 0;
+  max-width: var(--measure);
 }
 
 .error {
