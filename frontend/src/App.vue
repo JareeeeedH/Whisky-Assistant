@@ -67,36 +67,51 @@ async function ask(question: string): Promise<void> {
 </script>
 
 <template>
-  <header class="page header">
-    <span class="logo">Whiskey Assistant</span>
-  </header>
+  <!-- 有回答後才放寬頁面：首頁維持窄欄，標題與範例的行寬才舒適 -->
+  <div class="app" :class="{ 'has-entries': entries.length > 0 }">
+    <header class="page header">
+      <span class="logo">Whiskey Assistant</span>
+    </header>
 
-  <main class="page main" :class="{ 'is-empty': entries.length === 0 }">
-    <EmptyState v-if="entries.length === 0" @pick="pickExample">
-      <ChatInput
-        ref="centeredInput"
-        v-model="draft"
-        :disabled="isAsking"
-        :docked="false"
-        @submit="ask"
-      />
-    </EmptyState>
-    <ChatEntry v-for="entry in entries" :key="entry.id" :entry="entry" />
-  </main>
+    <main class="page main" :class="{ 'is-empty': entries.length === 0 }">
+      <EmptyState v-if="entries.length === 0" @pick="pickExample">
+        <ChatInput
+          ref="centeredInput"
+          v-model="draft"
+          :disabled="isAsking"
+          :docked="false"
+          @submit="ask"
+        />
+      </EmptyState>
+      <ChatEntry v-for="entry in entries" :key="entry.id" :entry="entry" />
+    </main>
 
-  <!-- 開始對話後輸入框改固定在底部，新的回答才不會把它一路往下推 -->
-  <ChatInput
-    v-if="entries.length > 0"
-    v-model="draft"
-    :disabled="isAsking"
-    :docked="true"
-    @submit="ask"
-  />
+    <!-- 開始對話後輸入框改固定在底部，新的回答才不會把它一路往下推 -->
+    <ChatInput
+      v-if="entries.length > 0"
+      v-model="draft"
+      :disabled="isAsking"
+      :docked="true"
+      @submit="ask"
+    />
+  </div>
 </template>
 
 <style scoped>
+/* 頁面寬度做成變數，底部固定的輸入框也讀同一個值來對齊內容欄 */
+.app {
+  --page-width: 40rem;
+}
+
+/* 寬螢幕上三款推薦並排，頁面要放寬才放得下 */
+@media (min-width: 64rem) {
+  .app.has-entries {
+    --page-width: 78rem;
+  }
+}
+
 .page {
-  max-width: 40rem;
+  max-width: var(--page-width);
   margin: 0 auto;
   padding: 0 var(--gutter);
 }
@@ -116,12 +131,9 @@ async function ask(question: string): Promise<void> {
   padding-bottom: var(--dock-height);
 }
 
-/* 扣掉頁首高度後垂直置中；底部留較多空間，把標題和輸入框推到畫面偏上的位置 */
+/* 不再垂直置中：置中時標題離頁首太遠，高螢幕上會留一大片空白；改成固定的上方留白，靠近頁首 */
 .main.is-empty {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: calc(100dvh - 4.5rem);
-  padding-bottom: 24vh;
+  padding-top: 3vh;
+  padding-bottom: 4rem;
 }
 </style>

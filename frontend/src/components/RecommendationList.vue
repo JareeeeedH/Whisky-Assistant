@@ -191,6 +191,35 @@ function caskNumber(index: number): string {
   line-height: 1.7;
 }
 
+/* 寬螢幕三款並排，方便一眼比較；欄與欄之間用虛線分隔，延續帳冊的分隔方式 */
+@media (min-width: 64rem) {
+  .records {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    max-width: none;
+  }
+
+  /* 欄寬變窄，照片縮小把寬度留給文字 */
+  .record {
+    grid-template-columns: 5rem 1fr;
+    column-gap: 1rem;
+    padding: 1.5rem 1.25rem 0;
+    border-bottom: none;
+  }
+
+  .record:first-child {
+    padding-left: 0;
+  }
+
+  .record:last-child {
+    padding-right: 0;
+  }
+
+  .record + .record {
+    border-left: 1px dashed var(--oak);
+  }
+}
+
 @media (max-width: 30rem) {
   .record {
     grid-template-columns: 4.5rem 1fr;

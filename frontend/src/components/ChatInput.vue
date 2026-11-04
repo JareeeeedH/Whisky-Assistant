@@ -53,7 +53,7 @@ defineExpose({ focusAtEnd })
         v-model="text"
         rows="1"
         maxlength="1000"
-        placeholder="輸入你的威士忌問題"
+        placeholder="輸入你想找的威士忌風味"
       />
       <button type="submit" :disabled="disabled || text.trim() === ''">提問</button>
     </div>
@@ -69,9 +69,9 @@ defineExpose({ focusAtEnd })
   border-top: 1px solid var(--oak);
 }
 
-/* 固定在底部時脫離了 App.vue 的 .page（40rem 含左右 gutter），外框寬度要扣掉 gutter 才會和內容欄對齊 */
+/* 固定在底部時脫離了 App.vue 的 .page（含左右 gutter），外框寬度要扣掉 gutter 才會和內容欄對齊 */
 .is-docked .inner {
-  max-width: calc(40rem - 2 * var(--gutter));
+  max-width: calc(var(--page-width) - 2 * var(--gutter));
   margin-inline: auto;
 }
 
@@ -103,9 +103,14 @@ textarea {
   resize: none;
 }
 
-/* 空白狀態的輸入框是頁面主角，預設高一點，看起來就是要你寫字的地方 */
+/* 空白狀態的輸入框是頁面主角，留白與高度都放大，看起來就是要你寫字的地方 */
+.composer:not(.is-docked) .inner {
+  padding: 0.75rem 0.75rem 0.75rem 1.25rem;
+}
+
 .composer:not(.is-docked) textarea {
-  min-height: 4.2rem;
+  min-height: 6rem;
+  font-size: 1.1rem;
 }
 
 textarea::placeholder {
