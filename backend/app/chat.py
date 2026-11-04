@@ -5,9 +5,10 @@ from typing import Literal
 from openai import OpenAI
 from pydantic import BaseModel
 
-from app.retrieval import retrieve
+from app.retrieval import rerank, retrieve
 from app.schemas import ChatResponse, Recommendation, Source
 
+RETRIEVAL_CANDIDATES = int(os.environ.get("RETRIEVAL_CANDIDATES", "30"))
 RETRIEVAL_TOP_K = int(os.environ.get("RETRIEVAL_TOP_K", "3"))
 LLM_MODEL = os.environ.get("LLM_MODEL", "gpt-6-luna")
 
@@ -128,7 +129,9 @@ def answer_question(question: str) -> ChatResponse:
         return ChatResponse(recommendations=[], notice=OFF_TOPIC_NOTICE)
 
     # 用改寫後的英文查詢檢索：筆記是英文，中文原句對不準
-    sources = retrieve(analysis.search_query, RETRIEVAL_TOP_K)
+    # 向量檢索多取候選、再由 re-rank 挑出前幾名：實驗中好的酒款常落在向量排名第 20 到 29 名
+    candidates = retrieve(analysis.search_query, RETRIEVAL_CANDIDATES)
+    sources = rerank(analysis.search_query, candidates, RETRIEVAL_TOP_K)
     prompt = build_prompt(sources)
     descriptions = generate(prompt)
 
