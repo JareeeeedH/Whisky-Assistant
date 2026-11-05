@@ -47,7 +47,6 @@ function toggleFlavor(flavor: string): void {
 <template>
   <section class="empty">
     <h1 class="title">想找哪款威士忌呢？</h1>
-    <p class="subtitle">描述你想要的風味，從一萬四千多篇品飲筆記裡，為你挑出三支。</p>
     <slot />
     <p class="examples-heading">或從這裡開始</p>
     <ul class="examples">
