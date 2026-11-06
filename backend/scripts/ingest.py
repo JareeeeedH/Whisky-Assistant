@@ -16,14 +16,22 @@ from pathlib import Path
 
 import numpy as np
 import psycopg
+from dotenv import load_dotenv
+from openai import OpenAI
 from pgvector.psycopg import register_vector
 from psycopg.types.json import Jsonb
-from sentence_transformers import SentenceTransformer
 
 CLEAN_PATH = Path(__file__).resolve().parents[2] / "data" / "whisky_clean.json"
 
+# 後端用 uvicorn --env-file 載入 .env；腳本單獨執行，要自己載入才拿得到 OPENAI_API_KEY
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
 # 沒設定環境變數時，預設連 docker-compose 起的開發資料庫（帳密只用於本機開發）
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://whiskey:whiskey@localhost:5434/whiskey")
+# 必須和 app/retrieval.py 查詢時用的模型相同，向量才能互相比較
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small")
+# 單次請求有總 token 上限；最長的筆記約 800 token，200 筆最壞情況約 16 萬 token，仍在上限內
+BATCH_SIZE = 200
 
 
 def build_chunk(record: dict) -> str:
@@ -31,12 +39,17 @@ def build_chunk(record: dict) -> str:
 
 
 def embed(texts: list[str]) -> np.ndarray:
-    model = SentenceTransformer("BAAI/bge-m3")
-    return model.encode(
-        texts,
-        normalize_embeddings=True,
-        show_progress_bar=True,
-    )
+    client = OpenAI()
+    vectors = []
+    for start in range(0, len(texts), BATCH_SIZE):
+        batch = texts[start : start + BATCH_SIZE]
+        # 429 等暫時性錯誤由 SDK 自動重試；仍失敗就讓例外中斷，不寫入不完整的資料
+        response = client.embeddings.create(model=EMBEDDING_MODEL, input=batch)
+        for item in response.data:
+            vectors.append(item.embedding)
+        print(f"embedding {min(start + BATCH_SIZE, len(texts))}/{len(texts)}")
+    # OpenAI 回傳的向量已正規化為長度 1，不必像 bge-m3 那樣另外處理
+    return np.array(vectors, dtype=np.float32)
 
 
 def write_to_db(records: list[dict], chunks: list[str], vectors: np.ndarray) -> None:

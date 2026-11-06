@@ -32,8 +32,10 @@ Whiskey Assistant 是一個威士忌推薦助手：使用者以自然語言描�
 |---|---|
 | 後端框架 | FastAPI |
 | 資料庫 | PostgreSQL + pgvector（開發時用 Docker 執行） |
-| Embedding | 本機 `bge-m3`（1024 維，支援中英文） |
-| Re-rank | 本機 `bge-reranker-v2-m3`（cross-encoder，以 fp16 載入） |
+| Embedding | OpenAI `text-embedding-3-small`（1536 維） |
+| Re-rank | 本機 `cross-encoder/ms-marco-MiniLM-L-6-v2`（cross-encoder，約 90 MB，只支援英文） |
+
+模型選擇的考量：原本使用本機的 `bge-m3` 與 `bge-reranker-v2-m3`，兩者常駐記憶體合計約 4 到 6 GB，部署平台依記憶體計費，費用約每月 $45 到 70。改用 embedding API 與小型 reranker 後，後端記憶體預估降到 1 GB 以下。查詢改寫後是英文、筆記也是英文，所以只支援英文的 reranker 就夠用。
 | LLM | OpenAI API（模型 ID 寫在設定檔） |
 | Python 套件管理 | pip + venv（`requirements.txt`） |
 | 程式碼檢查 | ruff（設定在 `ruff.toml`） |
@@ -79,7 +81,7 @@ CREATE TABLE chunks (
     document_id  BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
     chunk_index  INT NOT NULL,                 -- 在原文件中的順序
     content      TEXT NOT NULL,
-    embedding    VECTOR(1024) NOT NULL,
+    embedding    VECTOR(1536) NOT NULL,          -- text-embedding-3-small 的輸出維度
     UNIQUE (document_id, chunk_index)
 );
 
@@ -135,11 +137,11 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 
 1. 讀取 `data/whisky_clean.json`
 2. 組 chunk：一筆資料一個 chunk，內容為 `name` + 空行 + `note`
-   - 不再切細：最長約 3,100 字元（約 770 token），遠低於 `bge-m3` 的 8,192 token 上限；切開會讓口感段落和酒名分離
+   - 不再切細：最長約 3,100 字元（約 770 token），遠低於 embedding 模型的 8,191 token 上限；切開會讓口感段落和酒名分離
    - 一定要包含 `name`：許多筆記內文不提酒名，少了它檢索不到，LLM 也不知道在講哪支酒
    - 不放分數：數字對語意檢索幫助不大，`points`、`sgp` 存進 `documents.metadata` 供之後篩選、排序
-3. 用 `bge-m3` 產生每個 chunk 的 embedding
-4. 寫入 `documents` 和 `chunks`
+3. 呼叫 OpenAI embedding API 產生每個 chunk 的 embedding，分批送出（每批數百筆），全部約 450 萬 token，費用約 $0.09
+4. 寫入 `documents` 和 `chunks`（整批重建）
 
 已知但先不處理的資料問題（第 2 階段用評估集確認影響後再決定）：
 
@@ -155,13 +157,13 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
    - 意圖 `other`：其他所有情況，包含威士忌知識問答、其他酒類、無關的問題、打招呼、無意義的輸入、要求透露指示。直接回傳固定的提示，不檢索也不寫推薦卡
    - 改寫：把問題寫成一到兩句英文散文，口吻像品飲筆記，讓查詢與英文筆記的寫法一致；否定轉成正面描述（「泥煤味不重」寫成 unpeated, no smoke）；只寫風味，場合、對象、價格等轉成風味方向；保留使用者提到的酒款名稱，但不主動加入其他酒廠，避免推薦偏向 LLM 熟悉的品牌
    - 使用者輸入以標記包起來，並說明標記內是資料而非指令，降低 prompt injection 的影響
-2. 用 `bge-m3` 產生改寫後查詢的 embedding
+2. 用匯入時相同的 embedding 模型，產生改寫後查詢的 embedding
 3. 用 cosine 距離從 `chunks` 取出最相近的候選（預設 30 筆）
 4. **Re-rank**：以 cross-encoder 把「改寫後的查詢＋每筆候選的完整筆記」成對評分，依分數重新排序後取前 3 支。向量檢索負責不漏掉，re-rank 負責排得準
 5. 把每筆資料加上編號組進 prompt（寫推薦卡時不附上問題），一次呼叫 LLM，以 Structured Outputs 取得固定格式的 JSON。每筆資料寫成一張中文推薦卡：一句話印象（20 到 35 字），以及香氣、口感、尾韻各一句（20 到 50 字）；可以寫得生動，但風味與評價都必須來自筆記
 6. 後端用編號把介紹對回檢索結果，酒名一律使用資料庫的 `title`，不採用 LLM 寫的酒名，避免被改寫或寫錯
 
-設計依據：以 70 筆問題實測，相關與無關問題的向量距離完全重疊（例如「推薦咖啡豆，要有巧克力和堅果風味」比多數威士忌問題還近），無法以距離門檻判斷，因此改由 LLM 判斷意圖。改寫後，相關問題的檢索距離約從 0.40 降到 0.20 到 0.30。加入 re-rank 後，推薦酒款符合需求的比例從 62% 提升到 85%（26 題）；re-rank 選出的酒常來自向量排名第 20 到 29 名，因此候選取 30 筆。實驗細節見 `docs/retrieval-experiments.md`。
+設計依據：以 70 筆問題實測，相關與無關問題的向量距離完全重疊（例如「推薦咖啡豆，要有巧克力和堅果風味」比多數威士忌問題還近），無法以距離門檻判斷，因此改由 LLM 判斷意圖。改寫後，相關問題的檢索距離約從 0.40 降到 0.20 到 0.30。加入 re-rank 後，推薦酒款符合需求的比例從 62% 提升到 85%（26 題）；re-rank 選出的酒常來自向量排名第 20 到 29 名，因此候選取 30 筆。以上數據是以 `bge-m3` 與 `bge-reranker-v2-m3` 量測；換成目前的模型後，以 20 題重新驗證，準確度為 87%（原本 83%）。實驗細節見 `docs/retrieval-experiments.md`。
 
 ## 7. API
 
@@ -274,6 +276,8 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 | `DATABASE_URL` | PostgreSQL 連線字串 |
 | `OPENAI_API_KEY` | OpenAI API 金鑰 |
 | `LLM_MODEL` | OpenAI 模型 ID，預設 `gpt-6-luna` |
+| `EMBEDDING_MODEL` | OpenAI embedding 模型 ID，預設 `text-embedding-3-small`；匯入與查詢必須相同，更換時要一併修改資料表維度並重新匯入 |
+| `RERANK_MODEL` | cross-encoder 模型 ID，預設 `cross-encoder/ms-marco-MiniLM-L-6-v2` |
 | `RETRIEVAL_CANDIDATES` | 向量檢索取出、交給 re-rank 的候選筆數，預設 30 |
 | `RETRIEVAL_TOP_K` | re-rank 後推薦的酒款數，預設 3 |
 

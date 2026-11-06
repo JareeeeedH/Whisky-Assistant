@@ -2,22 +2,26 @@ import os
 
 import numpy as np
 import psycopg
-import torch
+from openai import OpenAI
 from pgvector.psycopg import register_vector
-from sentence_transformers import CrossEncoder, SentenceTransformer
+from sentence_transformers import CrossEncoder
 
 from app.schemas import Source
 
 # 沒設定環境變數時，預設連 docker-compose 起的開發資料庫（帳密只用於本機開發）
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://whiskey:whiskey@localhost:5434/whiskey")
+# 必須和 scripts/ingest.py 匯入時用的模型相同，向量才能互相比較
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small")
+RERANK_MODEL = os.environ.get("RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
 
-model = SentenceTransformer("BAAI/bge-m3")
-# fp16 讓 VRAM 用量減半（約 1 GB），實驗確認排序結果不受影響
-reranker = CrossEncoder("BAAI/bge-reranker-v2-m3", model_kwargs={"torch_dtype": torch.float16})
+client = OpenAI(timeout=30)
+# 小模型常駐記憶體只要約 100 MB，CPU 上也夠快；只讀前 512 token，平均約 270 token 的筆記大多讀得完
+reranker = CrossEncoder(RERANK_MODEL)
 
 
 def embed_query(question: str) -> np.ndarray:
-    return model.encode(question, normalize_embeddings=True)
+    response = client.embeddings.create(model=EMBEDDING_MODEL, input=question)
+    return np.array(response.data[0].embedding, dtype=np.float32)
 
 
 def retrieve(question: str, top_k: int) -> list[Source]:

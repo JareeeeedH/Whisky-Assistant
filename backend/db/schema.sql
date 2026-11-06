@@ -13,8 +13,8 @@ CREATE TABLE chunks (
     document_id  BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
     chunk_index  INT NOT NULL,
     content      TEXT NOT NULL,
-    -- bge-m3 的輸出維度
-    embedding    VECTOR(1024) NOT NULL,
+    -- text-embedding-3-small 的輸出維度；換 embedding 模型時要一起改
+    embedding    VECTOR(1536) NOT NULL,
     UNIQUE (document_id, chunk_index)
 );
 
