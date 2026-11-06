@@ -278,6 +278,13 @@ CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
 | `LLM_MODEL` | OpenAI 模型 ID，預設 `gpt-6-luna` |
 | `EMBEDDING_MODEL` | OpenAI embedding 模型 ID，預設 `text-embedding-3-small`；匯入與查詢必須相同，更換時要一併修改資料表維度並重新匯入 |
 | `RERANK_MODEL` | cross-encoder 模型 ID，預設 `cross-encoder/ms-marco-MiniLM-L-6-v2` |
+| `CORS_ORIGINS` | 允許呼叫 API 的前端網址，多個以逗號分隔；只在部署時設定，本機開發走 Vite proxy 不需要 |
+
+前端（建置時讀取，設定在部署平台上）：
+
+| 變數 | 說明 |
+|---|---|
+| `VITE_API_BASE_URL` | 後端網址，例如 `https://xxx.up.railway.app`；本機開發不設定，以相對路徑 `/api` 經 Vite proxy 轉給後端 |
 | `RETRIEVAL_CANDIDATES` | 向量檢索取出、交給 re-rank 的候選筆數，預設 30 |
 | `RETRIEVAL_TOP_K` | re-rank 後推薦的酒款數，預設 3 |
 

@@ -14,13 +14,17 @@ export type ChatResponse = {
   notice: string | null
 }
 
+// 部署時前後端是不同網域，要直接呼叫後端網址；本機開發不設定，維持相對路徑走 Vite proxy。
+// VITE_ 開頭的變數在建置時寫進程式碼，改了要重新建置才會生效
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+
 // 只代表「可以直接顯示給使用者看」的錯誤，其他例外照常往上拋
 export class ChatError extends Error {}
 
 export async function askQuestion(question: string): Promise<ChatResponse> {
   let response: Response
   try {
-    response = await fetch('/api/chat', {
+    response = await fetch(`${API_BASE_URL}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question }),
