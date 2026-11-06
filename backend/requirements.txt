@@ -1,10 +1,11 @@
-# PyTorch 要從官方 CUDA 索引安裝才能用 GPU；預設的 PyPI 版只能用 CPU
---extra-index-url https://download.pytorch.org/whl/cu130
+# 只剩小型 reranker 在本機執行，CPU 就夠快；CPU 版 torch 比 CUDA 版小很多，部署的映像檔也跟著變小。
+# Linux 上 PyPI 的預設版會附帶 CUDA 套件，所以要指定官方的 CPU 索引
+--extra-index-url https://download.pytorch.org/whl/cpu
 
 fastapi==0.162.0
 uvicorn[standard]==0.54.0
 ruff==0.17.3
-torch==2.14.1+cu130
+torch==2.14.1+cpu
 sentence-transformers==6.2.0
 psycopg[binary]==3.3.6
 pgvector==0.5.1
