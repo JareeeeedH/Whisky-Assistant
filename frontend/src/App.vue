@@ -35,6 +35,16 @@ async function scrollToBottom(): Promise<void> {
     el.scrollTo({ top: el.scrollHeight })
   }
 }
+async function scrollToLatestEntry(): Promise<void> {
+  await nextTick()
+  const el = scroller.value
+  const latest = el?.lastElementChild
+  if (el === null || latest === null || latest === undefined) {
+    return
+  }
+  const offset = latest.getBoundingClientRect().top - el.getBoundingClientRect().top
+  el.scrollTo({ top: el.scrollTop + offset })
+}
 
 async function ask(question: string): Promise<void> {
 
@@ -61,7 +71,7 @@ async function ask(question: string): Promise<void> {
     entry.notice = result.notice
     entry.status = 'done'
     if (follow) {
-      await scrollToBottom()
+      await scrollToLatestEntry()
     }
   } catch (error) {
     if (!(error instanceof ChatError)) {
