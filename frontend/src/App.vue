@@ -76,7 +76,7 @@ async function ask(question: string): Promise<void> {
 </script>
 
 <template>
-  <!-- 有回答後才放寬頁面：首頁維持窄欄，標題與範例的行寬才舒適 -->
+  <!-- 有回答後改成固定一個視窗高的對話框版面，首頁則是一般捲動的頁面 -->
   <div class="app" :class="{ 'has-entries': entries.length > 0 }">
     <header class="page header">
       <span class="logo">Whiskey Assistant</span>
@@ -112,8 +112,12 @@ async function ask(question: string): Promise<void> {
   --page-width: 40rem;
 }
 
-/* 寬螢幕上三款推薦並排，頁面要放寬才放得下 */
+/* 寬螢幕上首頁要放酒瓶牆、結果頁要讓三款推薦並排，頁面都要放寬 */
 @media (min-width: 64rem) {
+  .app {
+    --page-width: 72rem;
+  }
+
   .app.has-entries {
     --page-width: 78rem;
   }

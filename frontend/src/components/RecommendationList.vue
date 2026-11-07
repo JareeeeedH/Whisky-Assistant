@@ -45,11 +45,14 @@ function caskNumber(index: number): string {
         </span>
       </div>
 
-      <div class="body">
+      <div class="head">
         <h3 class="name">{{ splitWhiskyTitle(item.title).name }}</h3>
         <p v-if="splitWhiskyTitle(item.title).details.length > 0" class="details">
           {{ briefDetails(splitWhiskyTitle(item.title).details) }}
         </p>
+      </div>
+
+      <div class="body">
         <p class="tagline">{{ item.tagline }}</p>
         <dl class="notes">
           <div>
@@ -79,13 +82,30 @@ function caskNumber(index: number): string {
   border-top: 1px dashed var(--oak);
 }
 
+/* 照片在左、酒名在右上；寬螢幕時內文改跨滿整欄（見下方 media query） */
 .record {
   display: grid;
   grid-template-columns: 6.5rem 1fr;
+  grid-template-areas:
+    'photo head'
+    'photo body';
+  grid-template-rows: auto 1fr;
   column-gap: 1.25rem;
   align-items: start;
   padding: 1.5rem 0;
   border-bottom: 1px dashed var(--oak);
+}
+
+.photo {
+  grid-area: photo;
+}
+
+.head {
+  grid-area: head;
+}
+
+.body {
+  grid-area: body;
 }
 
 /* 條目底部已有實線分隔，最後一筆不再重複一條虛線 */
@@ -199,12 +219,24 @@ function caskNumber(index: number): string {
     max-width: none;
   }
 
-  /* 欄寬變窄，照片縮小把寬度留給文字 */
+  /* 照片放大到接近原圖寬度（約 130px，再大會糊），酒名排在照片旁，
+     內文改跨滿整欄，三欄才不會因為照片佔寬而把文字擠成細長條 */
   .record {
-    grid-template-columns: 5rem 1fr;
+    grid-template-columns: 8rem 1fr;
+    grid-template-areas:
+      'photo head'
+      'body body';
+    grid-template-rows: auto auto;
+    /* 三欄會被拉成和最長那欄等高，多出的高度不要分給各列，內文才會從同一個高度開始 */
+    align-content: start;
     column-gap: 1rem;
     padding: 1.5rem 1.25rem 0;
     border-bottom: none;
+  }
+
+  /* 靠上對齊照片上緣：三欄的酒名行數不同，靠下對齊時各欄起點高低不一，上方也會留白 */
+  .head {
+    align-self: start;
   }
 
   .record:first-child {

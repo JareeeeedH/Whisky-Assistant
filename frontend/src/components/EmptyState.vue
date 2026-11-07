@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import BottleWall from './BottleWall.vue'
 
 const emit = defineEmits<{ pick: [question: string] }>()
 
@@ -46,30 +47,33 @@ function toggleFlavor(flavor: string): void {
 
 <template>
   <section class="empty">
-    <h1 class="title">想找哪款威士忌呢？</h1>
-    <slot />
-    <ul class="examples">
-      <li v-for="(example, index) in examples" :key="example">
-        <button type="button" @click="pickExample(example)">
-          <!-- 和結果頁同樣的桶號，讓首頁也帶到酒窖帳冊的識別；這裡不蓋章，動態只留給回答出現時 -->
-          <span class="cask-number" aria-hidden="true">{{ caskNumber(index) }}</span>
-          <span class="text">{{ example }}</span>
+    <div class="intro">
+      <h1 class="title">想找哪款威士忌呢？</h1>
+      <slot />
+      <ul class="examples">
+        <li v-for="(example, index) in examples" :key="example">
+          <button type="button" @click="pickExample(example)">
+            <!-- 和結果頁同樣的桶號，讓首頁也帶到酒窖帳冊的識別；這裡不蓋章，動態只留給回答出現時 -->
+            <span class="cask-number" aria-hidden="true">{{ caskNumber(index) }}</span>
+            <span class="text">{{ example }}</span>
+          </button>
+        </li>
+      </ul>
+      <p class="examples-heading">或用風味挑選</p>
+      <div class="flavors">
+        <button
+          v-for="flavor in flavors"
+          :key="flavor"
+          type="button"
+          class="flavor"
+          :aria-pressed="selectedFlavors.includes(flavor)"
+          @click="toggleFlavor(flavor)"
+        >
+          {{ flavor }}
         </button>
-      </li>
-    </ul>
-    <p class="examples-heading">或用風味挑選</p>
-    <div class="flavors">
-      <button
-        v-for="flavor in flavors"
-        :key="flavor"
-        type="button"
-        class="flavor"
-        :aria-pressed="selectedFlavors.includes(flavor)"
-        @click="toggleFlavor(flavor)"
-      >
-        {{ flavor }}
-      </button>
+      </div>
     </div>
+    <BottleWall class="wall" />
   </section>
 </template>
 
@@ -78,17 +82,30 @@ function toggleFlavor(flavor: string): void {
   padding: 2rem 0;
 }
 
+/* 酒瓶牆只在寬螢幕出現：窄螢幕放不下兩欄，硬塞會把輸入框擠到下面 */
+.wall {
+  display: none;
+}
+
+@media (min-width: 64rem) {
+  .empty {
+    display: grid;
+    grid-template-columns: minmax(0, 40rem) minmax(0, 1fr);
+    column-gap: 4rem;
+    align-items: start;
+  }
+
+  .wall {
+    display: grid;
+    margin-top: 0.5rem;
+  }
+}
+
 .title {
-  margin: 0;
+  margin: 0 0 1.25rem;
   font-size: clamp(2rem, 6vw, 2.75rem);
   font-weight: 700;
   line-height: 1.3;
-}
-
-.subtitle {
-  margin: 0.6rem 0 1.75rem;
-  max-width: var(--measure);
-  font-size: 1.05rem;
 }
 
 .examples-heading {
@@ -96,8 +113,9 @@ function toggleFlavor(flavor: string): void {
   font-size: 0.85rem;
 }
 
+/* 原本靠「或從這裡開始」標題和輸入框隔開；標題拿掉後改用上方留白 */
 .examples {
-  margin: 0;
+  margin: 1.75rem 0 0;
   padding: 0;
   list-style: none;
   border-top: 1px dashed var(--oak);
