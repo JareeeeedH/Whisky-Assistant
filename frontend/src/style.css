@@ -15,7 +15,6 @@
   /* 中文一個字約 1em，34em 即每行約 34 個字 */
   --measure: 34em;
   --gutter: 16px;
-  --dock-height: 8rem;
 }
 
 *,

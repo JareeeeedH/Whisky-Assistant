@@ -48,7 +48,6 @@ function toggleFlavor(flavor: string): void {
   <section class="empty">
     <h1 class="title">想找哪款威士忌呢？</h1>
     <slot />
-    <p class="examples-heading">或從這裡開始</p>
     <ul class="examples">
       <li v-for="(example, index) in examples" :key="example">
         <button type="button" @click="pickExample(example)">

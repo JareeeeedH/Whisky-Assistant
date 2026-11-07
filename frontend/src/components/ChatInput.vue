@@ -61,15 +61,13 @@ defineExpose({ focusAtEnd })
 </template>
 
 <style scoped>
+/* App.vue 以 flex 把畫面分成頁首、對話框、輸入框三段，輸入框自然停在底部，不必 fixed */
 .composer.is-docked {
-  position: fixed;
-  inset: auto 0 0;
-  padding: 1rem var(--gutter) 0.75rem;
-  background: var(--limewash);
-  border-top: 1px solid var(--oak);
+  flex: none;
+  padding: 0.75rem var(--gutter);
 }
 
-/* 固定在底部時脫離了 App.vue 的 .page（含左右 gutter），外框寬度要扣掉 gutter 才會和內容欄對齊 */
+/* 輸入框不在 App.vue 的 .page 裡（沒有左右 gutter），寬度要扣掉 gutter 才會和對話框對齊 */
 .is-docked .inner {
   max-width: calc(var(--page-width) - 2 * var(--gutter));
   margin-inline: auto;

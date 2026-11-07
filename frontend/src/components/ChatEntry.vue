@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Entry } from '../types'
+import LoadingSteps from './LoadingSteps.vue'
 import RecommendationList from './RecommendationList.vue'
 
 defineProps<{ entry: Entry }>()
@@ -9,7 +10,7 @@ defineProps<{ entry: Entry }>()
   <article class="entry">
     <h2 class="question">{{ entry.question }}</h2>
 
-    <p v-if="entry.status === 'loading'" class="waiting">正在挑選酒款…</p>
+    <LoadingSteps v-if="entry.status === 'loading'" />
 
     <p v-if="entry.error" class="error" role="alert">{{ entry.error }}</p>
 
@@ -25,7 +26,7 @@ defineProps<{ entry: Entry }>()
 
 <style scoped>
 .entry {
-  padding: 2.5rem 0 2.25rem;
+  padding: 2rem 0;
   border-bottom: 1px solid var(--oak);
 }
 
@@ -35,10 +36,6 @@ defineProps<{ entry: Entry }>()
   font-size: 1.5rem;
   font-weight: 700;
   line-height: 1.45;
-}
-
-.waiting {
-  margin: 0;
 }
 
 .notice {
